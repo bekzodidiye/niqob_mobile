@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIQOB O'G'IRLOVCHI: TUNNEL REJASI</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
+
+        :root {
+            --primary: #ffa500;
+            --danger: #ff0000;
+            --warning: #ffb700;
+            --bg-dark: #1a1a1a;
+            --panel-bg: rgba(20, 20, 20, 0.95);
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-color: #050505;
+        }
+
+        canvas { display: block; }
+
+        /* ALARM OVERLAY */
+        #alarm-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: red;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+            mix-blend-mode: overlay;
+        }
+        @keyframes alarmPulse {
+            0% { opacity: 0; }
+            50% { opacity: 0.3; }
+            100% { opacity: 0; }
+        }
+
+        /* UI STYLES */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 10, 0.98);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+
+        h1 { 
+            font-size: 3rem; 
+            margin: 0;
+            color: var(--danger);
+            text-shadow: 0 0 20px var(--danger);
+            letter-spacing: 5px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        h2 { color: var(--primary); margin-bottom: 20px; }
+
+        p { 
+            color: #ccc; 
+            max-width: 600px; 
+            text-align: left; 
+            font-family: 'Roboto Mono', monospace; 
+            font-size: 1rem; 
+            line-height: 1.6;
+            background: rgba(30,30,30,0.5);
+            padding: 20px;
+            border: 1px solid #444;
+            border-left: 5px solid var(--danger);
+        }
+
+        button {
+            background: #222;
+            color: #fff;
+            border: 2px solid #555;
+            padding: 15px 50px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            margin: 15px;
+            text-transform: uppercase;
+        }
+        
+        button:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            box-shadow: 0 0 20px rgba(255, 165, 0, 0.2);
+        }
+
+        /* HUD */
+        #hud-top {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            display: flex; justify-content: space-between;
+            pointer-events: none; z-index: 10;
+        }
+
+        .hud-panel {
+            background: var(--panel-bg);
+            border: 1px solid #444;
+            padding: 10px 25px;
+            border-radius: 2px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+
+        #mission-status { font-size: 1.1rem; font-weight: bold; text-align: center; color: #fff; max-width: 400px;}
+
+        /* INVENTORY */
+        #inventory-panel {
+            margin-top: 10px;
+            display: flex; gap: 10px;
+        }
+        .inv-slot {
+            width: 40px; height: 40px;
+            border: 2px solid #333;
+            background: #111;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 20px;
+            color: #555;
+        }
+        .inv-active { border-color: var(--primary); color: #fff; box-shadow: 0 0 10px var(--primary); }
+
+        /* MOBILE CONTROLS */
+        #mobile-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            height: 180px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            pointer-events: none;
+            z-index: 150;
+        }
+
+        .joystick-zone {
+            width: 160px;
+            height: 160px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            position: relative;
+            pointer-events: auto;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            touch-action: none;
+        }
+
+        .d-pad-btn {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.5rem;
+            user-select: none;
+        }
+
+        .d-up { top: 5px; left: 55px; }
+        .d-down { bottom: 5px; left: 55px; }
+        .d-left { left: 5px; top: 55px; }
+        .d-right { right: 5px; top: 55px; }
+
+        .action-zone {
+            display: flex;
+            gap: 20px;
+            pointer-events: auto;
+        }
+
+        .mobile-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(255, 0, 0, 0.2);
+            border: 3px solid var(--danger);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.5rem;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+            touch-action: none;
+            user-select: none;
+        }
+
+        .btn-shift {
+            background: rgba(255, 165, 0, 0.2);
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(255, 165, 0, 0.3);
+            width: 60px;
+            height: 60px;
+            font-size: 1rem;
+        }
+
+        .active-btn {
+            background: rgba(255, 255, 255, 0.4) !important;
+            transform: scale(0.9);
+        }
+
+        /* DISGUISE UI */
+        #disguise-panel {
+            position: absolute; bottom: 20px; left: 20px;
+            display: flex; align-items: flex-end; gap: 20px;
+            pointer-events: none; z-index: 10;
+        }
+        
+        .avatar-box {
+            width: 80px; height: 80px;
+            border: 4px solid #555;
+            background: #000;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 40px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        
+        .noise-meter {
+            width: 150px; height: 15px;
+            background: #000;
+            border: 1px solid #444;
+            position: relative;
+            overflow: hidden;
+        }
+        .noise-bar {
+            height: 100%; background: var(--primary); width: 0%;
+            transition: width 0.1s, background 0.2s;
+        }
+
+        /* MINIMAP */
+        #minimap-wrap {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 200px; height: 200px;
+            background: #000;
+            border: 2px solid #555;
+            z-index: 10;
+            opacity: 0.9;
+        }
+
+        /* NOTIFICATIONS */
+        #notification-area {
+            position: absolute; top: 15% !important; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none; z-index: 50;
+            width: 100%;
+        }
+        .pop-text {
+            font-size: 2rem; color: #fff;
+            text-shadow: 0 0 10px #000;
+            font-weight: bold;
+            animation: popUp 2s forwards;
+        }
+        @keyframes popUp {
+            0% { transform: scale(0); opacity: 0; }
+            20% { transform: scale(1.2); opacity: 1; }
+            80% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        #interaction-prompt {
+            position: absolute;
+            background: #fff; color: #000;
+            padding: 5px 10px; font-weight: bold; font-family: sans-serif;
+            border-radius: 4px; pointer-events: none; display: none;
+            z-index: 40;
+            box-shadow: 0 0 10px #000;
+        }
+        
+        #hidden-indicator {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -150%);
+            color: #888;
+            font-weight: bold;
+            font-size: 1.5rem;
+            display: none;
+            z-index: 30;
+            text-shadow: 0 0 5px #000;
+        }
+        
+        #alarm-text {
+             position: absolute; top: 10%; width: 100%; text-align: center;
+             color: red; font-size: 3rem; font-weight: bold; letter-spacing: 10px;
+             display: none; z-index: 20;
+             animation: flashText 0.5s infinite;
+             text-shadow: 0 0 20px red;
+        }
+        @keyframes flashText { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+
+        /* RESPONSIVE MEDIA QUERIES - IMPROVED */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.5rem; letter-spacing: 2px; }
+            h2 { font-size: 1rem; }
+            p { font-size: 0.8rem; padding: 10px; max-width: 90%; }
+            button { padding: 10px 25px; font-size: 0.9rem; margin: 10px; }
+            
+            #mobile-controls { display: flex !important; }
+            
+            /* Move these UP to avoid buttons */
+            #minimap-wrap { 
+                width: 100px !important; 
+                height: 100px !important; 
+                bottom: 200px !important; 
+                right: 10px !important; 
+            }
+            #disguise-panel { 
+                bottom: 200px !important; 
+                left: 10px !important; 
+                scale: 0.7; 
+                transform-origin: left bottom; 
+            }
+            #hud-top { 
+                top: 5px !important;
+                left: 5px !important;
+                right: 5px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 5px !important;
+                pointer-events: none;
+            }
+            .hud-row-1 {
+                display: flex;
+                justify-content: space-between;
+                gap: 5px;
+            }
+            .hud-panel { 
+                padding: 6px !important; 
+                margin: 0 !important;
+                flex: 1;
+            }
+            #mission-status { 
+                font-size: 0.8rem !important; 
+                background: rgba(0,0,0,0.8);
+                border: 1px solid var(--danger);
+                width: 100% !important;
+                padding: 8px !important;
+            }
+            #level-disp, #time-disp { font-size: 1.1rem !important; }
+            .inv-slot { width: 30px; height: 30px; font-size: 16px; }
+            
+            #alarm-text { font-size: 1.2rem; top: 25%; }
+
+            #hud-mobile-extras {
+                display: flex !important;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 5px;
+                width: 100%;
+                margin-top: 5px;
+            }
+            #disguise-panel, #minimap-wrap { 
+                display: none !important; 
+            }
+            #disguise-panel-mobile, #minimap-wrap-mobile {
+                flex: 1;
+                display: flex;
+                justify-content: center;
+                background: rgba(0,0,0,0.5);
+                border: 1px solid #333;
+                padding: 5px;
+                height: 70px;
+                overflow: hidden;
+            }
+            #disguise-content {
+                scale: 1; /* Reset scale */
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                gap: 2px;
+                width: 100%;
+                height: 100%;
+            }
+            .avatar-box { width: 30px !important; height: 30px !important; font-size: 18px !important; border-width: 2px !important; }
+            #outfit-name { font-size: 0.6rem !important; margin: 0 !important; }
+            .noise-meter { width: 100% !important; height: 8px !important; }
+            div[style*="font-size: 0.9em"] { font-size: 0.5rem !important; margin: 0 !important; }
+            
+            #minimap {
+                width: 100% !important;
+                height: 100% !important;
+                image-rendering: pixelated;
+            }
+            
+            .joystick-zone { width: 130px; height: 130px; }
+            .d-pad-btn { width: 40px; height: 40px; font-size: 1.2rem; }
+            .d-up { left: 45px; } .d-down { left: 45px; } .d-left { top: 45px; } .d-right { top: 45px; }
+            
+            .mobile-btn { width: 60px; height: 60px; font-size: 1.2rem; }
+            .btn-shift { width: 50px; height: 50px; }
+
+            /* Ensure screens are readable */
+            .screen { padding: 20px; box-sizing: border-box; }
+            .screen h1 { font-size: 1.4rem; }
+            .screen p { font-size: 0.75rem; line-height: 1.4; padding: 10px; border-width: 1px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="alarm-overlay"></div>
+    <div id="alarm-text">DIQQAT! SIGNALIZATSIYA!</div>
+
+    <!-- UI LAYER -->
+    <div id="hud-top" class="hidden">
+        <div class="hud-row-1">
+            <div class="hud-panel">
+                <span style="color:#888; font-size:0.8em;">QAVAT</span>
+                <span id="level-disp" style="font-size:1.5em">1</span>
+            </div>
+            <div class="hud-panel">
+                <div id="inventory-panel">
+                    <div class="inv-slot" id="inv-key">🔑</div>
+                    <div class="inv-slot" id="inv-doc">📄</div>
+                </div>
+            </div>
+            <div class="hud-panel">
+                <span style="color:#888; font-size:0.8em;">VAQT</span>
+                <span id="time-disp" style="font-size:1.5em">00:00</span>
+            </div>
+        </div>
+        <div id="mission-status" class="hud-panel">BOSS xonasidan KALITNI toping</div>
+        
+        <div id="hud-mobile-extras" class="hidden">
+            <div id="disguise-panel-mobile"></div>
+            <div id="minimap-wrap-mobile"></div>
+        </div>
+    </div>
+
+    <div id="disguise-panel" class="hidden">
+        <div id="disguise-content">
+            <div class="avatar-box" id="avatar-box">
+                <div id="avatar-icon">👤</div>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <div style="font-size: 0.9em; color: #aaa; margin-bottom:5px;">SHOVQIN DARAJASI</div>
+                <div class="noise-meter">
+                    <div class="noise-bar" id="noise-bar"></div>
+                </div>
+                <div id="outfit-name" style="margin-top:5px; font-size: 1.2em; color: #fff;">MAHBUS NIQOBI</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="minimap-wrap" class="hidden">
+        <canvas id="minimap"></canvas>
+    </div>
+
+    <div id="mobile-controls" class="hidden">
+        <div class="joystick-zone">
+            <div class="d-pad-btn d-up" id="btn-up">▲</div>
+            <div class="d-pad-btn d-down" id="btn-down">▼</div>
+            <div class="d-pad-btn d-left" id="btn-left">◀</div>
+            <div class="d-pad-btn d-right" id="btn-right">▶</div>
+        </div>
+        <div class="action-zone">
+            <div class="mobile-btn btn-shift" id="btn-shift">S</div>
+            <div class="mobile-btn btn-action" id="btn-action">E</div>
+        </div>
+    </div>
+
+    <div id="notification-area"></div>
+    <div id="interaction-prompt">E</div>
+    <div id="hidden-indicator">YASHIRINGAN (KO'RINMAS)</div>
+
+    <!-- SCREENS -->
+    <div id="menu-screen" class="screen">
+        <h1>MAXFIY TUNNEL</h1>
+        <h2>QOCHISH REJASI</h2>
+        <p>
+            1. <b>BOSS xonasini</b> toping va <b>KALITNI</b> o'g'irlang.<br>
+            2. Kalit bilan <b>HUJJAT XONASIDAGI</b> yashirin eshikni oching.<br>
+            3. Hujjatni olgach <b>SIGNALIZATSIYA</b> ishga tushadi!<br>
+            4. Yashirin tunnel orqali aylanib o'tib, qochib keting.<br>
+            <br>
+            <span style="color:var(--danger)">DIQQAT:</span> Signalizatsiya vaqtida sizni kimdir ko'rsa - O'YIN TUGAYDI!
+        </p>
+        <button onclick="Game.startNew()">MISSIYANI BOSHLASH</button>
+    </div>
+
+    <div id="gameover-screen" class="screen hidden">
+        <h1 style="color: var(--danger); text-shadow: 0 0 30px red;">MISSIA BARBOD BO'LDI</h1>
+        <p id="fail-reason">Sizni payqab qolishdi.</p>
+        <button onclick="Game.retry()">QAYTA URINISH</button>
+        <button onclick="Game.toMenu()" style="border-color: #555; color: #888;">MENYU</button>
+    </div>
+
+    <div id="win-screen" class="screen hidden">
+        <h1 style="color: var(--warning); text-shadow: 0 0 30px orange;">MISSIA BAJARILDI</h1>
+        <p>Hujjat xavfsiz joyda. Ajoyib ish!</p>
+        <button onclick="Game.nextLevel()">KEYINGI QAVAT</button>
+    </div>
+</div>
+
+<script>
+const Game = (function() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const mmCanvas = document.getElementById('minimap');
+    const mmCtx = mmCanvas.getContext('2d');
+
+    // UI Refs
+    const ui = {
+        screens: {
+            menu: document.getElementById('menu-screen'),
+            gameover: document.getElementById('gameover-screen'),
+            win: document.getElementById('win-screen')
+        },
+        hudTop: document.getElementById('hud-top'),
+        disguisePanel: document.getElementById('disguise-panel'),
+        minimapWrap: document.getElementById('minimap-wrap'),
+        levelDisp: document.getElementById('level-disp'),
+        timeDisp: document.getElementById('time-disp'),
+        missionStatus: document.getElementById('mission-status'),
+        avatarIcon: document.getElementById('avatar-icon'),
+        avatarBox: document.getElementById('avatar-box'),
+        noiseBar: document.getElementById('noise-bar'),
+        outfitName: document.getElementById('outfit-name'),
+        notifArea: document.getElementById('notification-area'),
+        prompt: document.getElementById('interaction-prompt'),
+        failReason: document.getElementById('fail-reason'),
+        hiddenIndicator: document.getElementById('hidden-indicator'),
+        alarmOverlay: document.getElementById('alarm-overlay'),
+        alarmText: document.getElementById('alarm-text'),
+        invKey: document.getElementById('inv-key'),
+        invDoc: document.getElementById('inv-doc')
+    };
+
+    // Constants
+    const TILE = 64;
+    const COLORS = {
+        wall: '#222', 
+        floor: '#3a3a3a',
+        bossFloor: '#400000',
+        secureFloor: '#1a3a4a',
+        tunnelFloor: '#2a2a2a'
+    };
+    
+    const TYPES = {
+        CIVILIAN: { id: 0, name: 'MAHBUS', color: '#ffa500', rank: 0, viewDist: 200, viewAngle: 1.2 }, 
+        GUARD:    { id: 1, name: 'SOQCHI', color: '#4488ff', rank: 1, viewDist: 320, viewAngle: 1.6 },
+        BOSS:     { id: 2, name: 'BOSS', color: '#ff0000', rank: 2, viewDist: 450, viewAngle: 2.2 } 
+    };
+
+    // State
+    let state = {
+        active: false,
+        level: 1,
+        width: 100, height: 100,
+        camera: {x: 0, y: 0},
+        startTime: 0,
+        hasKey: false,
+        hasDocument: false,
+        tunnelOpen: false,
+        alarmTriggered: false,
+        bossRoom: null
+    };
+
+    let map = []; // 1=Wall, 0=Floor, 2=BossFloor, 3=SecureFloor, 4=TunnelFloor
+    let entities = [];
+    let particles = [];
+    let player = { 
+        x: 0, y: 0, angle: 0, 
+        disguise: TYPES.CIVILIAN, 
+        noise: 0, 
+        maxSpeed: 4,
+        isHidden: false
+    };
+    
+    const keys = {};
+    const mouse = { x: 0, y: 0 };
+
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // Keyboard
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if(e.code === 'KeyE') interact();
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
+        
+        // Mouse
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        // Touch Controls
+        const setupTouchBtn = (id, keyCode) => {
+            const btn = document.getElementById(id);
+            const handleStart = (e) => {
+                e.preventDefault();
+                keys[keyCode] = true;
+                btn.classList.add('active-btn');
+                if(keyCode === 'KeyE') interact();
+            };
+            const handleEnd = (e) => {
+                e.preventDefault();
+                keys[keyCode] = false;
+                btn.classList.remove('active-btn');
+            };
+            btn.addEventListener('touchstart', handleStart);
+            btn.addEventListener('touchend', handleEnd);
+            btn.addEventListener('touchcancel', handleEnd);
+            
+            // Mouse fallback for testing
+            btn.addEventListener('mousedown', () => { keys[keyCode] = true; if(keyCode === 'KeyE') interact(); });
+            btn.addEventListener('mouseup', () => { keys[keyCode] = false; });
+        };
+
+        setupTouchBtn('btn-up', 'KeyW');
+        setupTouchBtn('btn-down', 'KeyS');
+        setupTouchBtn('btn-left', 'KeyA');
+        setupTouchBtn('btn-right', 'KeyD');
+        setupTouchBtn('btn-action', 'KeyE');
+        setupTouchBtn('btn-shift', 'ShiftLeft');
+
+        // Touch Rotation Support
+        window.addEventListener('touchstart', e => {
+            if (e.target.closest('#mobile-controls')) return;
+            updateTouchPos(e.touches[0]);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', e => {
+            if (e.target.closest('#mobile-controls')) return;
+            updateTouchPos(e.touches[0]);
+        }, { passive: false });
+
+        function updateTouchPos(touch) {
+            mouse.x = touch.clientX;
+            mouse.y = touch.clientY;
+        }
+
+        requestAnimationFrame(loop);
+    }
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        state.width = canvas.width;
+        state.height = canvas.height;
+        
+        // Resize minimap
+        const activeMmWrap = (window.innerWidth <= 768) ? 
+            document.getElementById('minimap-wrap-mobile') : 
+            document.getElementById('minimap-wrap');
+            
+        if (activeMmWrap) {
+            mmCanvas.width = activeMmWrap.clientWidth;
+            mmCanvas.height = activeMmWrap.clientHeight;
+        }
+
+        // Redraw immediately to avoid flickering/black screen on resize
+        if(state.active) draw();
+    }
+
+    // --- MAP GENERATION ---
+    function generateLevel(lvl) {
+        const size = Math.min(30 + lvl * 2, 80);
+        const enemyCount = 7 + Math.floor(lvl * 1.5);
+        
+        let newMap = Array(size).fill().map(() => Array(size).fill(1));
+        let rooms = [];
+
+        // 1. Create Rooms
+        const roomAttempts = 40;
+        for(let i=0; i<roomAttempts; i++) {
+            let w = Math.floor(Math.random() * 4) + 5; 
+            let h = Math.floor(Math.random() * 4) + 5; 
+            let x = Math.floor(Math.random() * (size - w - 2)) + 1;
+            let y = Math.floor(Math.random() * (size - h - 2)) + 1;
+
+            let overlap = false;
+            for(let r of rooms) {
+                if (x < r.x + r.w + 1 && x + w + 1 > r.x &&
+                    y < r.y + r.h + 1 && y + h + 1 > r.y) {
+                    overlap = true;
+                    break;
+                }
+            }
+            if(!overlap) {
+                rooms.push({x, y, w, h});
+                for(let ry=y; ry<y+h; ry++) {
+                    for(let rx=x; rx<x+w; rx++) {
+                        newMap[ry][rx] = 0;
+                    }
+                }
+            }
+        }
+
+        // 2. Connect Rooms
+        for(let i=0; i<rooms.length-1; i++) {
+            let r1 = rooms[i];
+            let r2 = rooms[i+1];
+            let c1 = {x: Math.floor(r1.x + r1.w/2), y: Math.floor(r1.y + r1.h/2)};
+            let c2 = {x: Math.floor(r2.x + r2.w/2), y: Math.floor(r2.y + r2.h/2)};
+
+            let x = c1.x; let y = c1.y;
+            while(x !== c2.x) { newMap[y][x] = 0; newMap[y+1][x] = 0; x += (c2.x > x ? 1 : -1); }
+            while(y !== c2.y) { newMap[y][x] = 0; newMap[y][x+1] = 0; y += (c2.y > y ? 1 : -1); }
+        }
+
+        // 3. Assign Special Rooms
+        let startRoom = rooms[0];
+        
+        // Find Furthest room for BOSS (Key)
+        let bossRoom = rooms[rooms.length-1];
+        let maxDist = 0;
+        for(let r of rooms) {
+            let d = Math.hypot(r.x - startRoom.x, r.y - startRoom.y);
+            if(d > maxDist) { maxDist = d; bossRoom = r; }
+        }
+
+        // Find another room for DOCUMENT (Mid range)
+        let docRoom = rooms[Math.floor(rooms.length/2)];
+        // Ensure docRoom is not bossRoom or startRoom
+        if(docRoom === bossRoom || docRoom === startRoom) docRoom = rooms[rooms.length-2];
+
+        // Mark Floors
+        for(let ry=bossRoom.y; ry<bossRoom.y+bossRoom.h; ry++) {
+            for(let rx=bossRoom.x; rx<bossRoom.x+bossRoom.w; rx++) newMap[ry][rx] = 2; // Boss Floor
+        }
+        for(let ry=docRoom.y; ry<docRoom.y+docRoom.h; ry++) {
+            for(let rx=docRoom.x; rx<docRoom.x+docRoom.w; rx++) newMap[ry][rx] = 3; // Secure Floor
+        }
+
+        return { map: newMap, rooms, startRoom, bossRoom, docRoom, enemyCount };
+    }
+
+    function startGame(level) {
+        state.level = level;
+        const gen = generateLevel(level);
+        map = gen.map;
+        entities = [];
+        particles = [];
+
+        // Reset State
+        state.hasKey = false;
+        state.hasDocument = false;
+        state.tunnelOpen = false;
+        state.alarmTriggered = false;
+        state.bossRoom = gen.bossRoom;
+
+        ui.invKey.classList.remove('inv-active');
+        ui.invDoc.classList.remove('inv-active');
+        ui.invKey.style.opacity = '0.3';
+        ui.invDoc.style.opacity = '0.3';
+
+        // Player
+        player.x = (gen.startRoom.x + gen.startRoom.w/2) * TILE;
+        player.y = (gen.startRoom.y + gen.startRoom.h/2) * TILE;
+        player.disguise = TYPES.CIVILIAN;
+        player.isHidden = false;
+        state.camera.x = player.x - state.width/2;
+        state.camera.y = player.y - state.height/2;
+
+        updateDisguiseUI();
+
+        // 1. KEY (In Boss Room)
+        entities.push({
+            type: 'KEY',
+            x: (gen.bossRoom.x + gen.bossRoom.w/2) * TILE,
+            y: (gen.bossRoom.y + gen.bossRoom.h/2) * TILE,
+            active: true
+        });
+
+        // 2. DOCUMENT (In Doc Room)
+        entities.push({
+            type: 'DOCUMENT',
+            x: (gen.docRoom.x + gen.docRoom.w/2) * TILE,
+            y: (gen.docRoom.y + gen.docRoom.h/2) * TILE,
+            active: true
+        });
+
+        // 3. SECRET DOOR (In Doc Room wall)
+        // Find a spot on the wall of doc room to place secret door
+        let doorX = gen.docRoom.x * TILE;
+        let doorY = (gen.docRoom.y + Math.floor(gen.docRoom.h/2)) * TILE;
+        entities.push({
+            type: 'SECRET_DOOR',
+            x: doorX, y: doorY,
+            active: true // active means closed/locked
+        });
+
+        // 4. TUNNEL EXIT POINT (Near Start)
+        let tunnelExitX = (gen.startRoom.x + 1) * TILE;
+        let tunnelExitY = (gen.startRoom.y + 1) * TILE;
+
+        // Add reference to door for teleport logic
+        let door = entities.find(e => e.type === 'SECRET_DOOR');
+        door.targetX = tunnelExitX;
+        door.targetY = tunnelExitY;
+
+        // 5. MAIN EXIT
+        entities.push({
+            type: 'EXIT',
+            x: (gen.startRoom.x + gen.startRoom.w/2) * TILE,
+            y: (gen.startRoom.y + gen.startRoom.h/2) * TILE,
+            active: false
+        });
+
+        // Vents
+        for(let i=0; i<8; i++) {
+            let r = gen.rooms[Math.floor(Math.random() * gen.rooms.length)];
+            entities.push({ type: 'VENT', x: (r.x+1)*TILE, y: (r.y+1)*TILE });
+        }
+
+        // Enemies
+        for(let i=0; i<gen.enemyCount; i++) {
+            let r = gen.rooms[Math.floor(Math.random() * gen.rooms.length)];
+            let ex = (r.x + Math.random()*r.w) * TILE;
+            let ey = (r.y + Math.random()*r.h) * TILE;
+            
+            if(dist({x:ex, y:ey}, player) > 400) { 
+                let isBoss = r === gen.bossRoom;
+                entities.push({
+                    type: 'ENEMY',
+                    subtype: isBoss ? TYPES.BOSS : TYPES.GUARD,
+                    x: ex, y: ey,
+                    angle: Math.random() * 6.28,
+                    state: 'PATROL',
+                    alert: 0,
+                    stunned: 0,
+                    pathTimer: 0,
+                    targetX: ex, targetY: ey
+                });
+            }
+        }
+
+        state.startTime = Date.now();
+        state.active = true;
+
+        showScreen('game');
+        resize(); // Ensure canvases are sized correctly after being shown
+        ui.missionStatus.innerHTML = "BOSS XONASIDAN <span style='color:cyan'>KALITNI</span> TOPING";
+        ui.alarmOverlay.style.animation = 'none';
+        ui.alarmText.style.display = 'none';
+        ui.levelDisp.innerText = state.level;
+    }
+
+    function triggerAlarm() {
+        state.alarmTriggered = true;
+        ui.alarmOverlay.style.animation = 'alarmPulse 1s infinite';
+        ui.alarmText.style.display = 'block';
+        
+        ui.missionStatus.innerHTML = "TUNNEL ORQALI QOCHING! TEZROQ!";
+        ui.missionStatus.style.color = "red";
+
+        // Enemies rush to Document Room initially
+        let docInfo = entities.find(e => e.type === 'DOCUMENT'); // old pos
+        // But doc is gone, so let's use player pos or just random search
+        
+        entities.forEach(e => {
+            if(e.type === 'ENEMY') {
+                e.state = 'ALARM_RESPONSE';
+                e.alert = 50; 
+                e.targetX = player.x; 
+                e.targetY = player.y;
+            }
+        });
+    }
+
+    function interact() {
+        if(!state.active) return;
+
+        let acted = false;
+        
+        entities.forEach(e => {
+            if(acted) return;
+            let d = dist(player, e);
+
+            // --- KEY INTERACTION ---
+            if(e.type === 'KEY' && e.active && d < TILE) {
+                e.active = false;
+                state.hasKey = true;
+                ui.invKey.classList.add('inv-active');
+                ui.invKey.style.opacity = '1';
+                showNotification("KALIT TOPILDI!", "cyan");
+                ui.missionStatus.innerHTML = "HUJJAT XONASINI TOPING VA <span style='color:lime'>TUNNELNI OCHING</span>";
+                acted = true;
+            }
+            
+            // --- SECRET DOOR INTERACTION ---
+            else if(e.type === 'SECRET_DOOR' && e.active && d < TILE*1.5) {
+                if(state.hasKey) {
+                    e.active = false; // Opens
+                    state.tunnelOpen = true;
+                    showNotification("TUNNEL OCHILDI!", "lime");
+                    spawnParticles(e.x, e.y, 30, '#555');
+                    // Create visual 'hole'
+                    e.type = 'TUNNEL_ENTRANCE'; 
+                    acted = true;
+                } else {
+                    showNotification("KALIT KERAK!", "red");
+                }
+            }
+
+            // --- TUNNEL TELEPORT ---
+            else if(e.type === 'TUNNEL_ENTRANCE' && d < TILE) {
+                // Teleport to exit area
+                showNotification("TUNNELGA KIRILDI...", "#aaa");
+                player.x = e.targetX;
+                player.y = e.targetY;
+                acted = true;
+            }
+
+            // --- DOCUMENT INTERACTION ---
+            else if(e.type === 'DOCUMENT' && e.active && d < TILE) {
+                if(!state.tunnelOpen) {
+                    showNotification("AVVAL TUNNELNI OCHING!", "orange");
+                } else {
+                    e.active = false;
+                    state.hasDocument = true;
+                    ui.invDoc.classList.add('inv-active');
+                    ui.invDoc.style.opacity = '1';
+                    
+                    let exit = entities.find(x => x.type === 'EXIT');
+                    exit.active = true;
+                    
+                    showNotification("HUJJAT OLINDI! SIGNALIZATSIYA!", "red");
+                    triggerAlarm();
+                    acted = true;
+                }
+            }
+
+            else if(e.type === 'EXIT' && e.active && d < TILE) {
+                win();
+                acted = true;
+            }
+
+            else if(e.type === 'ENEMY' && e.stunned > 0 && d < TILE) {
+                 player.disguise = e.subtype;
+                 e.subtype = TYPES.CIVILIAN; 
+                 updateDisguiseUI();
+                 showNotification("NIQOB O'G'IRLANDI", "#00ff9d");
+                 spawnParticles(player.x, player.y, 20, '#fff');
+                 acted = true;
+            }
+        });
+
+        if(!acted) {
+            let target = getNearestEnemy(TILE + 20);
+            if(target && target.alert < 50 && target.stunned <= 0) {
+                let angleToPlayer = Math.atan2(player.y - target.y, player.x - target.x);
+                let angleDiff = Math.abs(normalizeAngle(angleToPlayer - target.angle));
+                
+                if(angleDiff > 1.5) { 
+                    target.stunned = 600; 
+                    target.alert = 0;
+                    target.state = 'PATROL';
+                    showNotification("ZARARSIZLANTIRILDI", "#aaa");
+                    spawnParticles(target.x, target.y, 10, '#ff0000');
+                }
+            }
+        }
+    }
+
+    function update() {
+        if(!state.active) return;
+
+        let elapsed = Math.floor((Date.now() - state.startTime)/1000);
+        let m = Math.floor(elapsed/60).toString().padStart(2,'0');
+        let s = (elapsed%60).toString().padStart(2,'0');
+        ui.timeDisp.innerText = `${m}:${s}`;
+
+        // Movement
+        let dx = 0, dy = 0;
+        let speed = keys['ShiftLeft'] ? player.maxSpeed * 1.6 : player.maxSpeed;
+        player.noise = (keys['ShiftLeft'] && (dx||dy)) ? 100 : 0; // Fix noise logic
+
+        if(keys['KeyW']) dy = -speed;
+        if(keys['KeyS']) dy = speed;
+        if(keys['KeyA']) dx = -speed;
+        if(keys['KeyD']) dx = speed;
+        if(dx!==0 || dy!==0) player.noise = keys['ShiftLeft'] ? 80 : 0;
+
+        if(!isWall(player.x + dx, player.y)) player.x += dx;
+        if(!isWall(player.x, player.y + dy)) player.y += dy;
+
+        let cx = player.x - state.width/2;
+        let cy = player.y - state.height/2;
+        player.angle = Math.atan2(mouse.y - (player.y - cy - state.camera.y), mouse.x - (player.x - cx - state.camera.x)); 
+        // Camera follow
+        state.camera.x += (player.x - state.width/2 - state.camera.x) * 0.1;
+        state.camera.y += (player.y - state.height/2 - state.camera.y) * 0.1;
+
+        ui.prompt.style.display = 'none';
+
+        // Hiding
+        player.isHidden = false;
+        let onVent = false;
+        entities.forEach(e => {
+            if(e.type === 'VENT' && dist(player, e) < 30) {
+                player.isHidden = true; onVent = true;
+            }
+        });
+        ui.hiddenIndicator.style.display = onVent ? 'block' : 'none';
+
+        // Update Entities
+        entities.forEach(e => {
+            if(e.type === 'ENEMY') updateEnemy(e);
+            
+            let d = dist(player, e);
+            if(d < TILE) {
+                if(e.type === 'KEY' && e.active) showPrompt(e, "KALITNI OLISH");
+                if(e.type === 'SECRET_DOOR' && e.active) showPrompt(e, state.hasKey ? "TUNNELNI OCHISH" : "KILITLANGAN (KALIT KERAK)");
+                if(e.type === 'TUNNEL_ENTRANCE') showPrompt(e, "KIRISH");
+                if(e.type === 'DOCUMENT' && e.active) showPrompt(e, state.tunnelOpen ? "HUJJATNI OLISH" : "AVVAL TUNNELNI OCHING");
+                if(e.type === 'EXIT' && e.active) showPrompt(e, "QOCHISH");
+                
+                if(e.type === 'ENEMY') {
+                     if(e.stunned > 0 && e.subtype.id !== 0) showPrompt(e, "NIQOBNI OLISH");
+                     else if(e.stunned <= 0 && !player.isHidden) {
+                          let angleToP = Math.atan2(player.y - e.y, player.x - e.x);
+                          if(Math.abs(normalizeAngle(angleToP - e.angle)) > 1.5) showPrompt(e, "ZARARSIZLANTIRISH");
+                     }
+                }
+            }
+        });
+
+        let noiseP = player.noise > 0 ? 100 : 0;
+        ui.noiseBar.style.width = noiseP + '%';
+        ui.noiseBar.style.background = noiseP > 50 ? 'red' : 'var(--primary)';
+    }
+
+    function updateEnemy(e) {
+        if(e.stunned > 0) { e.stunned--; return; }
+
+        let dToPlayer = dist(player, e);
+        let angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+        
+        // HEARING
+        if(player.noise > 0 && dToPlayer < 250) {
+            e.state = 'INVESTIGATE';
+            e.targetX = player.x; e.targetY = player.y;
+            e.pathTimer = 100;
+        }
+
+        // VISION
+        let angleDiff = Math.abs(normalizeAngle(angleToPlayer - e.angle));
+        let seePlayer = false;
+
+        if(!player.isHidden && dToPlayer < e.subtype.viewDist && angleDiff < e.subtype.viewAngle/2) {
+            if(!rayCast(e.x, e.y, player.x, player.y)) {
+                let detected = false;
+                
+                // Normal Logic
+                if(e.subtype.id === TYPES.BOSS.id && player.disguise.id !== TYPES.BOSS.id) detected = true;
+                if(e.subtype.id === TYPES.GUARD.id && player.disguise.id === TYPES.CIVILIAN.id) detected = true;
+                
+                // Alarm Logic: If alarm is on, ANYONE seeing you is instant Game Over (unless invisible)
+                if(state.alarmTriggered) {
+                     detected = true;
+                }
+
+                if(detected) {
+                    e.alert += state.alarmTriggered ? 5 : 2; // Fast detect on alarm
+                    e.state = 'CHASE';
+                    e.targetX = player.x; e.targetY = player.y;
+                    seePlayer = true;
+                }
+            }
+        } 
+        
+        if(!seePlayer && e.state !== 'ALARM_RESPONSE') e.alert = Math.max(0, e.alert - 0.5);
+
+        if(e.alert >= 100) gameOver("SIZNI " + e.subtype.name + " KO'RIB QOLDI!");
+
+        // MOVEMENT
+        let moveSpeed = 1.5;
+        if (e.state === 'CHASE') moveSpeed = 3.5;
+        else if (e.state === 'ALARM_RESPONSE') moveSpeed = 3.0;
+
+        if(e.state === 'PATROL') {
+            if(e.pathTimer <= 0 || dist({x:e.targetX, y:e.targetY}, e) < 10) {
+                let ang = Math.random() * 6.28;
+                e.targetX = e.x + Math.cos(ang) * 200;
+                e.targetY = e.y + Math.sin(ang) * 200;
+                e.pathTimer = 200;
+            } else { e.pathTimer--; }
+        }
+
+        let mAngle = Math.atan2(e.targetY - e.y, e.targetX - e.x);
+        e.angle = lerpAngle(e.angle, mAngle, 0.1);
+
+        let mx = Math.cos(e.angle) * moveSpeed;
+        let my = Math.sin(e.angle) * moveSpeed;
+
+        if(!isWall(e.x + mx, e.y)) e.x += mx;
+        else { e.pathTimer = 0; if(!isWall(e.x, e.y + my)) e.y += my; }
+        if(!isWall(e.x, e.y + my)) e.y += my;
+    }
+
+    function draw() {
+        ctx.fillStyle = '#050505';
+        ctx.fillRect(0, 0, state.width, state.height);
+
+        if(!state.active) return; 
+
+        ctx.save();
+        ctx.translate(-state.camera.x, -state.camera.y);
+
+        // Map
+        let startCol = Math.floor(state.camera.x / TILE);
+        let endCol = startCol + (state.width / TILE) + 1;
+        let startRow = Math.floor(state.camera.y / TILE);
+        let endRow = startRow + (state.height / TILE) + 1;
+
+        for(let r = Math.max(0,startRow); r < Math.min(map.length, endRow); r++) {
+            for(let c = Math.max(0,startCol); c < Math.min(map[0].length, endCol); c++) {
+                let type = map[r][c];
+                let x = c * TILE; let y = r * TILE;
+
+                if(type === 1) { // Wall
+                    ctx.fillStyle = COLORS.wall;
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.strokeRect(x, y, TILE, TILE);
+                } else { // Floor
+                    ctx.fillStyle = COLORS.floor;
+                    if(type === 2) ctx.fillStyle = COLORS.bossFloor;
+                    if(type === 3) ctx.fillStyle = COLORS.secureFloor;
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.strokeStyle = '#222'; ctx.strokeRect(x, y, TILE, TILE);
+                }
+            }
+        }
+
+        // Entities
+        entities.forEach(e => {
+            if(e.type === 'VENT') {
+                ctx.fillStyle = '#111'; ctx.fillRect(e.x-20, e.y-20, 40, 40);
+                ctx.strokeStyle = '#333'; ctx.strokeRect(e.x-20, e.y-20, 40, 40);
+                // Grate lines
+                ctx.beginPath();
+                for(let i=-20; i<20; i+=10) { ctx.moveTo(e.x+i, e.y-20); ctx.lineTo(e.x+i, e.y+20); }
+                ctx.stroke();
+            }
+            if(e.type === 'KEY' && e.active) {
+                ctx.fillStyle = 'cyan';
+                ctx.font = '30px sans-serif';
+                ctx.fillText('🔑', e.x-15, e.y+10);
+            }
+            if(e.type === 'SECRET_DOOR' && e.active) {
+                ctx.fillStyle = '#444'; // Looks like a wall but slightly different
+                ctx.fillRect(e.x, e.y, TILE, TILE);
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(e.x, e.y, TILE, TILE);
+                ctx.fillStyle = 'red';
+                ctx.font = '12px monospace';
+                ctx.fillText("LOCKED", e.x+10, e.y+35);
+            }
+            if(e.type === 'TUNNEL_ENTRANCE') {
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(e.x+32, e.y+32, 25, 0, 6.28); ctx.fill();
+                ctx.strokeStyle = 'lime';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = 'lime'; ctx.font = '12px monospace'; ctx.fillText("TUNNEL", e.x+15, e.y+35);
+            }
+            if(e.type === 'DOCUMENT' && e.active) {
+                ctx.fillStyle = '#420'; ctx.fillRect(e.x-30, e.y-15, 60, 30);
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 15; ctx.shadowColor = 'white';
+                ctx.fillRect(e.x-10, e.y-14, 20, 28);
+                ctx.shadowBlur = 0;
+            }
+            if(e.type === 'EXIT' && e.active) {
+                ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(Date.now()/1000);
+                ctx.strokeStyle = '#0f0'; ctx.lineWidth = 4; ctx.setLineDash([10, 10]);
+                ctx.beginPath(); ctx.arc(0, 0, 40, 0, 6.28); ctx.stroke();
+                ctx.restore();
+            }
+        });
+
+        // Enemies
+        entities.forEach(e => { if(e.type === 'ENEMY') drawCharacter(e); });
+
+        // Player
+        if(player.isHidden) ctx.globalAlpha = 0.4;
+        drawCharacter({ x: player.x, y: player.y, angle: player.angle, subtype: player.disguise, type: 'PLAYER' });
+        ctx.globalAlpha = 1.0;
+
+        // Particles
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.life--;
+            ctx.fillStyle = p.color; ctx.globalAlpha = p.life / 20;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+            ctx.globalAlpha = 1;
+            if(p.life<=0) particles.splice(i,1);
+        });
+
+        ctx.restore();
+        drawMinimap();
+    }
+
+    function drawCharacter(c) {
+        ctx.save(); ctx.translate(c.x, c.y);
+        
+        if(c.type === 'ENEMY' && c.stunned <= 0) {
+            ctx.rotate(c.angle);
+            let grad = ctx.createRadialGradient(0, 0, 10, 0, 0, c.subtype.viewDist);
+            let color = '255, 255, 255';
+            if(c.state === 'INVESTIGATE') color = '255, 200, 0';
+            if(c.state === 'CHASE' || c.state === 'ALARM_RESPONSE') color = '255, 0, 0';
+            
+            grad.addColorStop(0, `rgba(${color}, 0.3)`);
+            grad.addColorStop(1, `rgba(${color}, 0)`);
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.moveTo(0, 0);
+            ctx.arc(0, 0, c.subtype.viewDist, -c.subtype.viewAngle/2, c.subtype.viewAngle/2);
+            ctx.fill();
+        } else { ctx.rotate(c.angle); }
+
+        let color = c.subtype ? c.subtype.color : '#fff';
+        ctx.shadowColor = color; ctx.shadowBlur = 10;
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, 14, 0, 6.28); ctx.fill();
+
+        ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 6.28); ctx.fill();
+        ctx.fillStyle = color; ctx.fillRect(8, 4, 12, 4); 
+
+        if(c.subtype && c.subtype.id === TYPES.BOSS.id) {
+            ctx.fillStyle = 'gold'; ctx.font = "20px Arial"; ctx.fillText("👑", -10, -10);
+        }
+        if(c.stunned > 0) {
+             ctx.fillStyle = '#fff'; ctx.font = "20px Arial"; ctx.fillText("💫", -10, -20);
+        }
+        if(c.alert > 0) {
+            ctx.fillStyle = 'red'; ctx.fillRect(-15, -30, 30 * (c.alert/100), 4);
+        }
+        ctx.shadowBlur = 0; ctx.restore();
+    }
+
+    function drawMinimap() {
+        if(!map || map.length === 0) return;
+        mmCtx.fillStyle = '#000'; mmCtx.fillRect(0, 0, mmCanvas.width, mmCanvas.height);
+        
+        // Follow Player Logic
+        const zoom = 0.8; // Zoom factor
+        const viewSize = 10; // Number of tiles to show around player
+        const scale = mmCanvas.width / (viewSize * 2);
+        
+        const pCol = player.x / TILE;
+        const pRow = player.y / TILE;
+
+        mmCtx.save();
+        mmCtx.translate(mmCanvas.width/2, mmCanvas.height/2);
+        mmCtx.scale(zoom, zoom);
+        mmCtx.translate(-pCol * scale, -pRow * scale);
+
+        for(let r = Math.floor(pRow - viewSize); r < Math.ceil(pRow + viewSize); r++) {
+            for(let c = Math.floor(pCol - viewSize); c < Math.ceil(pCol + viewSize); c++) {
+                if(r < 0 || r >= map.length || c < 0 || c >= map[0].length) continue;
+                
+                let x = c * scale;
+                let y = r * scale;
+                
+                if(map[r][c]===1) { mmCtx.fillStyle = '#444'; mmCtx.fillRect(x, y, scale, scale); }
+                else if (map[r][c]===2) { mmCtx.fillStyle = '#500'; mmCtx.fillRect(x, y, scale, scale); }
+                else if (map[r][c]===3) { mmCtx.fillStyle = '#005'; mmCtx.fillRect(x, y, scale, scale); }
+                else { mmCtx.fillStyle = '#111'; mmCtx.fillRect(x, y, scale, scale); }
+            }
+        }
+
+        function drawDot(e, color) {
+            mmCtx.fillStyle = color; mmCtx.beginPath();
+            mmCtx.arc(e.x/TILE*scale, e.y/TILE*scale, 4, 0, 6.28); mmCtx.fill();
+        }
+        
+        drawDot(player, '#0f0');
+        entities.forEach(e => {
+            if(e.type === 'KEY' && e.active) drawDot(e, 'cyan');
+            if(e.type === 'DOCUMENT' && e.active) drawDot(e, 'gold');
+            if(e.type === 'SECRET_DOOR' && e.active) drawDot(e, 'magenta');
+            if(e.type === 'EXIT' && e.active) drawDot(e, '#0f0');
+            if(e.type === 'ENEMY' && e.stunned<=0) drawDot(e, 'red');
+        });
+        
+        mmCtx.restore();
+    }
+
+    // --- UTILS ---
+    function isWall(x, y) {
+        if(!map || map.length === 0) return true;
+        let c = Math.floor(x/TILE); let r = Math.floor(y/TILE);
+        if(r<0 || r>=map.length || c<0 || c>=map[0].length) return true;
+        
+        // Secret door acts as wall until opened
+        for(let e of entities) {
+            if(e.type === 'SECRET_DOOR' && e.active) {
+                if(x > e.x && x < e.x+TILE && y > e.y && y < e.y+TILE) return true;
+            }
+        }
+        return map[r][c] === 1;
+    }
+    
+    function rayCast(x1, y1, x2, y2) {
+        let dist = Math.hypot(x2-x1, y2-y1);
+        let steps = dist / 20;
+        let dx = (x2-x1)/steps; let dy = (y2-y1)/steps;
+        for(let i=0; i<steps; i++) { if(isWall(x1 + dx*i, y1 + dy*i)) return true; }
+        return false;
+    }
+
+    function dist(a, b) { return Math.hypot(a.x-b.x, a.y-b.y); }
+    function normalizeAngle(a) { return a - (2*Math.PI) * Math.floor((a + Math.PI) / (2*Math.PI)); }
+    function lerpAngle(a, b, t) {
+        let d = b - a; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
+        return a + d * t;
+    }
+    function spawnParticles(x, y, n, c) {
+        for(let i=0; i<n; i++) particles.push({
+            x, y, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*10, life:30, size:Math.random()*4, color:c
+        });
+    }
+    function getNearestEnemy(range) {
+        let nearest = null; let minD = range;
+        entities.forEach(e => { if(e.type === 'ENEMY') { let d = dist(player, e); if(d < minD) { minD = d; nearest = e; } } });
+        return nearest;
+    }
+    function showPrompt(obj, text) {
+        let px = obj.x - state.camera.x;
+        let py = obj.y - state.camera.y - 40;
+        ui.prompt.style.display = 'block';
+        ui.prompt.style.left = px + 'px'; ui.prompt.style.top = py + 'px';
+        ui.prompt.innerHTML = `<span style='color:red'>E</span> - ${text}`;
+    }
+    function showNotification(text, color) {
+        const div = document.createElement('div');
+        div.className = 'pop-text'; div.innerText = text; div.style.color = color;
+        ui.notifArea.appendChild(div);
+        setTimeout(() => div.remove(), 2000);
+    }
+    function updateDisguiseUI() {
+        let icon = '👤'; if(player.disguise.id === 1) icon = '👮'; if(player.disguise.id === 2) icon = '👹';
+        ui.avatarIcon.innerText = icon;
+        ui.avatarBox.style.borderColor = player.disguise.color;
+        ui.outfitName.innerText = player.disguise.name;
+        ui.outfitName.style.color = player.disguise.color;
+    }
+    function showScreen(name) {
+        Object.values(ui.screens).forEach(s => s.classList.add('hidden'));
+        ui.hudTop.classList.add('hidden'); 
+        ui.disguisePanel.classList.add('hidden'); 
+        ui.minimapWrap.classList.add('hidden');
+        document.getElementById('mobile-controls').classList.add('hidden');
+
+        if(name === 'game') { 
+            ui.hudTop.classList.remove('hidden'); 
+            if (window.innerWidth <= 768) {
+                document.getElementById('mobile-controls').classList.remove('hidden');
+                document.getElementById('hud-mobile-extras').classList.remove('hidden');
+                // Move contents
+                document.getElementById('disguise-panel-mobile').appendChild(document.getElementById('disguise-content'));
+                document.getElementById('minimap-wrap-mobile').appendChild(mmCanvas);
+            } else {
+                ui.disguisePanel.classList.remove('hidden'); 
+                ui.minimapWrap.classList.remove('hidden'); 
+                document.getElementById('disguise-panel').appendChild(document.getElementById('disguise-content'));
+                document.getElementById('minimap-wrap').appendChild(mmCanvas);
+            }
+        }
+        else { 
+            ui.screens[name].classList.remove('hidden'); 
+        }
+    }
+    function startNew() { startGame(1); }
+    function nextLevel() { startGame(state.level + 1); }
+    function retry() { startGame(state.level); }
+    function toMenu() { state.active = false; showScreen('menu'); }
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+    function win() { state.active = false; showScreen('win'); }
+    function gameOver(reason) { state.active = false; ui.failReason.innerText = reason; showScreen('gameover'); }
+
+    init();
+    return { startNew, nextLevel, retry, toMenu };
+})();
+</script>
+</body>
+</html>
