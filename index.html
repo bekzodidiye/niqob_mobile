@@ -2,277 +2,515 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#050505">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Niqob O'g'irlovchi — stealth o'yini. Kalitni o'g'irlang, hujjatni oling va tunnel orqali qoching.">
     <title>NIQOB O'G'IRLOVCHI: TUNNEL REJASI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; }
 
         :root {
             --primary: #ffa500;
             --danger: #ff0000;
             --warning: #ffb700;
             --bg-dark: #1a1a1a;
-            --panel-bg: rgba(20, 20, 20, 0.95);
+            --panel-bg: rgba(20, 20, 20, 0.92);
+
+            --sat: env(safe-area-inset-top, 0px);
+            --sar: env(safe-area-inset-right, 0px);
+            --sab: env(safe-area-inset-bottom, 0px);
+            --sal: env(safe-area-inset-left, 0px);
+
+            --gap: clamp(6px, 1.6vmin, 20px);
+            --hud-h: 0px;                               /* set from JS */
+            --mm: clamp(120px, 22vmin, 200px);          /* minimap size */
+            --joy: clamp(110px, 30vmin, 160px);         /* joystick diameter */
+            --act: clamp(72px, 20vmin, 104px);          /* action button */
+            --run: clamp(56px, 15vmin, 80px);           /* run button */
+        }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+            background-color: var(--bg-dark);
         }
 
         body {
-            margin: 0;
-            background-color: var(--bg-dark);
+            position: fixed;
+            inset: 0;
             color: #fff;
-            font-family: 'Orbitron', sans-serif;
-            overflow: hidden;
+            font-family: 'Orbitron', system-ui, sans-serif;
             user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
             touch-action: none;
         }
 
         #game-container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
             background-color: #050505;
         }
 
-        canvas { display: block; }
+        #gameCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+        }
 
-        /* ALARM OVERLAY */
+        .hidden { display: none !important; }
+        body:not(.in-game) .game-ui { display: none !important; }
+
+        /* ---------- ALARM ---------- */
         #alarm-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            position: absolute; inset: 0;
             background: red;
             opacity: 0;
             pointer-events: none;
             z-index: 5;
             mix-blend-mode: overlay;
         }
-        @keyframes alarmPulse {
-            0% { opacity: 0; }
-            50% { opacity: 0.3; }
-            100% { opacity: 0; }
-        }
+        body.alarm #alarm-overlay { animation: alarmPulse 1s infinite; }
+        @keyframes alarmPulse { 0%, 100% { opacity: 0; } 50% { opacity: 0.3; } }
 
-        /* UI STYLES */
+        #alarm-text {
+            position: absolute;
+            left: 0; right: 0;
+            top: calc(var(--sat) + var(--hud-h) + var(--gap) * 2 + 10px);
+            text-align: center;
+            color: red;
+            font-size: clamp(1.1rem, 5vw, 3rem);
+            font-weight: bold;
+            letter-spacing: clamp(2px, 1.2vw, 10px);
+            display: none;
+            z-index: 20;
+            pointer-events: none;
+            animation: flashText 0.5s infinite;
+            text-shadow: 0 0 20px red;
+            padding: 0 var(--gap);
+        }
+        body.alarm.in-game #alarm-text { display: block; }
+        @keyframes flashText { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+        /* ---------- SCREENS ---------- */
         .screen {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(10, 10, 10, 0.98);
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+            background: rgba(10, 10, 10, 0.97);
+            padding: calc(var(--sat) + 16px) calc(var(--sar) + 16px) calc(var(--sab) + 16px) calc(var(--sal) + 16px);
+        }
+        #pause-screen { background: rgba(10, 10, 10, 0.82); }
+
+        .screen-inner {
+            margin: auto;                 /* centers, but scrolls safely when taller than viewport */
+            width: 100%;
+            max-width: 640px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            z-index: 100;
+            gap: clamp(8px, 2vh, 18px);
         }
-        .hidden { display: none !important; opacity: 0; pointer-events: none; }
 
-        h1 { 
-            font-size: 3rem; 
+        h1 {
+            font-size: clamp(1.4rem, 6vw, 3rem);
             margin: 0;
             color: var(--danger);
             text-shadow: 0 0 20px var(--danger);
-            letter-spacing: 5px;
+            letter-spacing: clamp(2px, 0.6vw, 5px);
             text-align: center;
             text-transform: uppercase;
+            line-height: 1.15;
+        }
+        h1.win { color: var(--warning); text-shadow: 0 0 30px orange; }
+        h1.pause { color: var(--primary); text-shadow: 0 0 20px rgba(255, 165, 0, 0.6); }
+
+        h2 {
+            color: var(--primary);
+            margin: 0;
+            font-size: clamp(0.95rem, 3vw, 1.5rem);
+            text-align: center;
         }
 
-        h2 { color: var(--primary); margin-bottom: 20px; }
-
-        p { 
-            color: #ccc; 
-            max-width: 600px; 
-            text-align: left; 
-            font-family: 'Roboto Mono', monospace; 
-            font-size: 1rem; 
+        .card {
+            width: 100%;
+            margin: 0;
+            color: #ccc;
+            text-align: left;
+            font-family: 'Roboto Mono', monospace;
+            font-size: clamp(0.78rem, 2.4vw, 1rem);
             line-height: 1.6;
-            background: rgba(30,30,30,0.5);
-            padding: 20px;
+            background: rgba(30, 30, 30, 0.5);
+            padding: clamp(10px, 2.5vw, 20px);
             border: 1px solid #444;
             border-left: 5px solid var(--danger);
         }
+        .card.center { text-align: center; }
 
-        button {
+        .controls-hint {
+            width: 100%;
+            margin: 0;
+            font-family: 'Roboto Mono', monospace;
+            font-size: clamp(0.7rem, 2vw, 0.85rem);
+            color: #999;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .controls-hint kbd {
+            display: inline-block;
+            border: 1px solid #555;
+            border-bottom-width: 2px;
+            border-radius: 3px;
+            padding: 0 5px;
+            color: #ddd;
+            font-family: inherit;
+        }
+        .hint-touch { display: none; }
+        body.touch-mode .hint-touch { display: block; }
+        body.touch-mode .hint-desktop { display: none; }
+
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .menu-btn {
+            min-height: 48px;
             background: #222;
             color: #fff;
             border: 2px solid #555;
-            padding: 15px 50px;
+            padding: 14px clamp(20px, 5vw, 50px);
             font-family: 'Orbitron', sans-serif;
-            font-size: 1.2rem;
+            font-size: clamp(0.85rem, 2.6vw, 1.2rem);
             font-weight: bold;
             cursor: pointer;
-            transition: 0.3s;
-            margin: 15px;
+            transition: border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s;
+            margin: 0;
             text-transform: uppercase;
+            touch-action: manipulation;
         }
-        
-        button:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-            box-shadow: 0 0 20px rgba(255, 165, 0, 0.2);
+        .menu-btn.secondary { border-color: #444; color: #999; }
+        .menu-btn:active { transform: scale(0.97); }
+        .menu-btn:focus-visible, .icon-btn:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 3px;
         }
+        @media (hover: hover) {
+            .menu-btn:hover, .icon-btn:hover {
+                border-color: var(--primary);
+                color: var(--primary);
+                box-shadow: 0 0 20px rgba(255, 165, 0, 0.2);
+            }
+        }
+        body.no-fs [data-action="fullscreen"] { display: none; }
 
-        /* HUD */
+        #win-time { color: var(--warning); font-weight: bold; }
+
+        /* ---------- HUD ---------- */
         #hud-top {
-            position: absolute; top: 20px; left: 20px; right: 20px;
-            display: flex; justify-content: space-between;
-            pointer-events: none; z-index: 10;
+            position: absolute;
+            top: calc(var(--sat) + var(--gap));
+            left: calc(var(--sal) + var(--gap));
+            right: calc(var(--sar) + var(--gap));
+            z-index: 10;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            grid-template-areas: "left mission right";
+            align-items: start;
+            gap: var(--gap);
+            pointer-events: none;
         }
+        .hud-group { display: flex; gap: var(--gap); align-items: stretch; }
+        .hud-left { grid-area: left; }
+        .hud-right { grid-area: right; }
 
         .hud-panel {
             background: var(--panel-bg);
             border: 1px solid #444;
-            padding: 10px 25px;
+            padding: clamp(4px, 1vmin, 10px) clamp(8px, 2vmin, 22px);
             border-radius: 2px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.15;
         }
+        .hud-label { color: #888; font-size: clamp(0.55rem, 1.3vmin, 0.8rem); }
+        .hud-value { font-size: clamp(1rem, 3.2vmin, 1.6rem); font-variant-numeric: tabular-nums; }
 
-        #mission-status { font-size: 1.1rem; font-weight: bold; text-align: center; color: #fff; max-width: 400px;}
-
-        /* INVENTORY */
-        #inventory-panel {
-            margin-top: 10px;
-            display: flex; gap: 10px;
+        #mission-status {
+            grid-area: mission;
+            justify-self: center;
+            width: 100%;
+            max-width: 560px;
+            font-size: clamp(0.68rem, 1.7vmin, 1.05rem);
+            font-weight: bold;
+            text-align: center;
+            color: #fff;
+            border-color: rgba(255, 0, 0, 0.6);
+            min-height: 100%;
         }
+        #mission-status.alarm-text-color { color: red; }
+
+        #inventory-panel { display: flex; gap: clamp(4px, 1vmin, 10px); }
         .inv-slot {
-            width: 40px; height: 40px;
+            width: clamp(28px, 5vmin, 42px);
+            height: clamp(28px, 5vmin, 42px);
             border: 2px solid #333;
             background: #111;
             display: flex; justify-content: center; align-items: center;
-            font-size: 20px;
-            color: #555;
+            font-size: clamp(14px, 2.6vmin, 20px);
+            opacity: 0.3;
+            transition: opacity 0.2s, box-shadow 0.2s, border-color 0.2s;
         }
-        .inv-active { border-color: var(--primary); color: #fff; box-shadow: 0 0 10px var(--primary); }
+        .inv-active { opacity: 1; border-color: var(--primary); box-shadow: 0 0 10px var(--primary); }
 
-        /* MOBILE CONTROLS */
-        #mobile-controls {
-            position: absolute;
-            bottom: 30px;
-            left: 0;
-            width: 100%;
-            height: 180px;
-            display: none;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 30px;
-            pointer-events: none;
-            z-index: 150;
-        }
-
-        .joystick-zone {
-            width: 160px;
-            height: 160px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 50%;
-            position: relative;
+        .icon-btn {
             pointer-events: auto;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            touch-action: none;
+            width: clamp(40px, 7vmin, 52px);
+            min-height: clamp(40px, 7vmin, 52px);
+            margin: 0;
+            padding: 0;
+            background: var(--panel-bg);
+            border: 1px solid #555;
+            color: #fff;
+            font-size: clamp(1rem, 2.6vmin, 1.3rem);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            touch-action: manipulation;
         }
 
-        .d-pad-btn {
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-size: 1.5rem;
-            user-select: none;
+        /* Narrow screens: mission text drops to its own row */
+        @media (max-width: 700px) {
+            #hud-top {
+                grid-template-columns: 1fr auto;
+                grid-template-areas: "left right" "mission mission";
+            }
         }
 
-        .d-up { top: 5px; left: 55px; }
-        .d-down { bottom: 5px; left: 55px; }
-        .d-left { left: 5px; top: 55px; }
-        .d-right { right: 5px; top: 55px; }
-
-        .action-zone {
-            display: flex;
-            gap: 20px;
-            pointer-events: auto;
-        }
-
-        .mobile-btn {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background: rgba(255, 0, 0, 0.2);
-            border: 3px solid var(--danger);
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            font-size: 1.5rem;
-            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
-            touch-action: none;
-            user-select: none;
-        }
-
-        .btn-shift {
-            background: rgba(255, 165, 0, 0.2);
-            border-color: var(--primary);
-            box-shadow: 0 0 15px rgba(255, 165, 0, 0.3);
-            width: 60px;
-            height: 60px;
-            font-size: 1rem;
-        }
-
-        .active-btn {
-            background: rgba(255, 255, 255, 0.4) !important;
-            transform: scale(0.9);
-        }
-
-        /* DISGUISE UI */
+        /* ---------- DISGUISE PANEL ---------- */
         #disguise-panel {
-            position: absolute; bottom: 20px; left: 20px;
-            display: flex; align-items: flex-end; gap: 20px;
-            pointer-events: none; z-index: 10;
+            position: absolute;
+            left: calc(var(--sal) + var(--gap));
+            bottom: calc(var(--sab) + var(--gap));
+            z-index: 10;
+            display: flex;
+            align-items: flex-end;
+            gap: 16px;
+            pointer-events: none;
         }
-        
         .avatar-box {
-            width: 80px; height: 80px;
+            width: clamp(56px, 9vmin, 80px);
+            height: clamp(56px, 9vmin, 80px);
             border: 4px solid #555;
             background: #000;
             display: flex; justify-content: center; align-items: center;
-            font-size: 40px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            position: relative;
+            font-size: clamp(28px, 4.6vmin, 40px);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            flex: none;
         }
-        
+        .disguise-info { margin-bottom: 6px; }
+        .disguise-label { font-size: clamp(0.6rem, 1.3vmin, 0.8rem); color: #aaa; margin-bottom: 5px; }
         .noise-meter {
-            width: 150px; height: 15px;
+            width: clamp(110px, 16vmin, 150px);
+            height: 12px;
             background: #000;
             border: 1px solid #444;
-            position: relative;
             overflow: hidden;
         }
         .noise-bar {
-            height: 100%; background: var(--primary); width: 0%;
+            height: 100%;
+            width: 0%;
+            background: var(--primary);
             transition: width 0.1s, background 0.2s;
         }
+        #outfit-name { margin-top: 5px; font-size: clamp(0.8rem, 2vmin, 1.15rem); color: #fff; }
 
-        /* MINIMAP */
+        /* ---------- MINIMAP ---------- */
         #minimap-wrap {
-            position: absolute; bottom: 20px; right: 20px;
-            width: 200px; height: 200px;
+            position: absolute;
+            right: calc(var(--sar) + var(--gap));
+            bottom: calc(var(--sab) + var(--gap));
+            width: var(--mm);
+            height: var(--mm);
             background: #000;
             border: 2px solid #555;
             z-index: 10;
             opacity: 0.9;
+            pointer-events: none;
+        }
+        #minimap { display: block; width: 100%; height: 100%; }
+
+        /* ---------- TOUCH LAYOUT ---------- */
+        body.touch-mode { --mm: clamp(80px, 22vmin, 130px); }
+
+        body.touch-mode #disguise-panel {
+            top: calc(var(--sat) + var(--hud-h) + var(--gap) * 2);
+            bottom: auto;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid #333;
+        }
+        body.touch-mode .avatar-box { width: 36px; height: 36px; font-size: 20px; border-width: 2px; }
+        body.touch-mode .disguise-info { margin: 0; }
+        body.touch-mode .disguise-label { font-size: 0.5rem; margin-bottom: 3px; }
+        body.touch-mode .noise-meter { width: 84px; height: 7px; }
+        body.touch-mode #outfit-name { font-size: 0.62rem; margin-top: 3px; }
+
+        body.touch-mode #minimap-wrap {
+            top: calc(var(--sat) + var(--hud-h) + var(--gap) * 2);
+            bottom: auto;
+        }
+        body.touch-mode #alarm-text {
+            top: calc(var(--sat) + var(--hud-h) + var(--mm) + var(--gap) * 3);
+            font-size: clamp(0.95rem, 4.4vw, 2rem);
         }
 
-        /* NOTIFICATIONS */
-        #notification-area {
-            position: absolute; top: 15% !important; left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            pointer-events: none; z-index: 50;
-            width: 100%;
+        #touch-controls {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            pointer-events: none;
         }
+        body.touch-mode.playing #touch-controls { display: block; }
+
+        #joy-zone {
+            position: absolute;
+            left: var(--sal);
+            bottom: var(--sab);
+            width: 50%;
+            height: min(60%, 360px);
+            pointer-events: auto;
+            touch-action: none;
+        }
+        #joy-base {
+            position: absolute;
+            width: var(--joy);
+            height: var(--joy);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid rgba(255, 255, 255, 0.18);
+            opacity: 0.55;
+            transition: opacity 0.15s;
+            pointer-events: none;
+        }
+        #joy-base.active { opacity: 1; }
+        #joy-knob {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 44%; height: 44%;
+            margin: -22% 0 0 -22%;
+            border-radius: 50%;
+            background: rgba(255, 165, 0, 0.3);
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 15px rgba(255, 165, 0, 0.35);
+            will-change: transform;
+        }
+
+        #action-zone {
+            position: absolute;
+            right: calc(var(--sar) + var(--gap) * 1.5);
+            bottom: calc(var(--sab) + var(--gap) * 1.5);
+            width: calc(var(--act) + var(--run) + 16px);
+            height: calc(var(--act) + var(--run) * 0.5);
+            pointer-events: none;
+        }
+        .touch-btn {
+            position: absolute;
+            margin: 0;
+            padding: 0;
+            border-radius: 50%;
+            pointer-events: auto;
+            touch-action: none;
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.1;
+            transition: transform 0.08s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
+        }
+        #btn-action {
+            right: 0;
+            bottom: 0;
+            width: var(--act);
+            height: var(--act);
+            background: rgba(255, 0, 0, 0.18);
+            border: 3px solid var(--danger);
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+            opacity: 0.7;
+        }
+        #btn-action.ready {
+            opacity: 1;
+            background: rgba(255, 0, 0, 0.35);
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.7);
+            animation: readyPulse 1s infinite;
+        }
+        @keyframes readyPulse { 50% { box-shadow: 0 0 8px rgba(255, 0, 0, 0.4); } }
+        .btn-glyph { font-size: calc(var(--act) * 0.32); }
+        .btn-sub {
+            font-size: clamp(0.45rem, 1.6vmin, 0.62rem);
+            max-width: 90%;
+            text-align: center;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+        #btn-run {
+            right: calc(var(--act) + 16px);
+            bottom: calc(var(--act) * 0.35);
+            width: var(--run);
+            height: var(--run);
+            background: rgba(255, 165, 0, 0.18);
+            border: 3px solid var(--primary);
+            box-shadow: 0 0 15px rgba(255, 165, 0, 0.3);
+            font-size: clamp(0.5rem, 1.8vmin, 0.7rem);
+        }
+        .touch-btn.pressed { transform: scale(0.9); background: rgba(255, 255, 255, 0.35) !important; }
+
+        /* ---------- IN-WORLD UI ---------- */
+        #notification-area {
+            position: absolute;
+            left: 0; right: 0;
+            top: calc(var(--sat) + var(--hud-h) + var(--gap) * 2 + 70px);
+            text-align: center;
+            pointer-events: none;
+            z-index: 50;
+            padding: 0 var(--gap);
+        }
+        body.touch-mode #notification-area { top: calc(var(--sat) + var(--hud-h) + var(--mm) + var(--gap) * 3 + 44px); }
         .pop-text {
-            font-size: 2rem; color: #fff;
-            text-shadow: 0 0 10px #000;
+            font-size: clamp(1rem, 4.5vmin, 2rem);
+            color: #fff;
+            text-shadow: 0 0 10px #000, 0 0 4px #000;
             font-weight: bold;
             animation: popUp 2s forwards;
         }
@@ -280,480 +518,612 @@
             0% { transform: scale(0); opacity: 0; }
             20% { transform: scale(1.2); opacity: 1; }
             80% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(1.5); opacity: 0; }
+            100% { transform: scale(1.4); opacity: 0; }
         }
 
         #interaction-prompt {
             position: absolute;
-            background: #fff; color: #000;
-            padding: 5px 10px; font-weight: bold; font-family: sans-serif;
-            border-radius: 4px; pointer-events: none; display: none;
+            left: 0; top: 0;
+            background: #fff;
+            color: #000;
+            padding: 5px 10px;
+            font-weight: bold;
+            font-family: system-ui, sans-serif;
+            font-size: clamp(0.7rem, 2.2vmin, 0.95rem);
+            white-space: nowrap;
+            border-radius: 4px;
+            pointer-events: none;
             z-index: 40;
             box-shadow: 0 0 10px #000;
+            will-change: transform;
         }
-        
+        #interaction-prompt .key { color: red; }
+
         #hidden-indicator {
             position: absolute;
             top: 50%; left: 50%;
-            transform: translate(-50%, -150%);
-            color: #888;
+            transform: translate(-50%, -260%);
+            color: #aaa;
             font-weight: bold;
-            font-size: 1.5rem;
-            display: none;
+            font-size: clamp(0.8rem, 3vmin, 1.5rem);
             z-index: 30;
             text-shadow: 0 0 5px #000;
+            pointer-events: none;
+            white-space: nowrap;
         }
-        
-        #alarm-text {
-             position: absolute; top: 10%; width: 100%; text-align: center;
-             color: red; font-size: 3rem; font-weight: bold; letter-spacing: 10px;
-             display: none; z-index: 20;
-             animation: flashText 0.5s infinite;
-             text-shadow: 0 0 20px red;
+
+        /* Short landscape screens (phones on their side) */
+        @media (max-height: 500px) {
+            .card { line-height: 1.45; }
+            .screen-inner { gap: 8px; }
+            .menu-btn { min-height: 44px; padding: 10px 24px; }
         }
-        @keyframes flashText { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
 
-        /* RESPONSIVE MEDIA QUERIES - IMPROVED */
-        @media (max-width: 768px) {
-            h1 { font-size: 1.5rem; letter-spacing: 2px; }
-            h2 { font-size: 1rem; }
-            p { font-size: 0.8rem; padding: 10px; max-width: 90%; }
-            button { padding: 10px 25px; font-size: 0.9rem; margin: 10px; }
-            
-            #mobile-controls { display: flex !important; }
-            
-            /* Move these UP to avoid buttons */
-            #minimap-wrap { 
-                width: 100px !important; 
-                height: 100px !important; 
-                bottom: 200px !important; 
-                right: 10px !important; 
-            }
-            #disguise-panel { 
-                bottom: 200px !important; 
-                left: 10px !important; 
-                scale: 0.7; 
-                transform-origin: left bottom; 
-            }
-            #hud-top { 
-                top: 5px !important;
-                left: 5px !important;
-                right: 5px !important;
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 5px !important;
-                pointer-events: none;
-            }
-            .hud-row-1 {
-                display: flex;
-                justify-content: space-between;
-                gap: 5px;
-            }
-            .hud-panel { 
-                padding: 6px !important; 
-                margin: 0 !important;
-                flex: 1;
-            }
-            #mission-status { 
-                font-size: 0.8rem !important; 
-                background: rgba(0,0,0,0.8);
-                border: 1px solid var(--danger);
-                width: 100% !important;
-                padding: 8px !important;
-            }
-            #level-disp, #time-disp { font-size: 1.1rem !important; }
-            .inv-slot { width: 30px; height: 30px; font-size: 16px; }
-            
-            #alarm-text { font-size: 1.2rem; top: 25%; }
-
-            #hud-mobile-extras {
-                display: flex !important;
-                justify-content: space-between;
-                align-items: flex-start;
-                gap: 5px;
-                width: 100%;
-                margin-top: 5px;
-            }
-            #disguise-panel, #minimap-wrap { 
-                display: none !important; 
-            }
-            #disguise-panel-mobile, #minimap-wrap-mobile {
-                flex: 1;
-                display: flex;
-                justify-content: center;
-                background: rgba(0,0,0,0.5);
-                border: 1px solid #333;
-                padding: 5px;
-                height: 70px;
-                overflow: hidden;
-            }
-            #disguise-content {
-                scale: 1; /* Reset scale */
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                gap: 2px;
-                width: 100%;
-                height: 100%;
-            }
-            .avatar-box { width: 30px !important; height: 30px !important; font-size: 18px !important; border-width: 2px !important; }
-            #outfit-name { font-size: 0.6rem !important; margin: 0 !important; }
-            .noise-meter { width: 100% !important; height: 8px !important; }
-            div[style*="font-size: 0.9em"] { font-size: 0.5rem !important; margin: 0 !important; }
-            
-            #minimap {
-                width: 100% !important;
-                height: 100% !important;
-                image-rendering: pixelated;
-            }
-            
-            .joystick-zone { width: 130px; height: 130px; }
-            .d-pad-btn { width: 40px; height: 40px; font-size: 1.2rem; }
-            .d-up { left: 45px; } .d-down { left: 45px; } .d-left { top: 45px; } .d-right { top: 45px; }
-            
-            .mobile-btn { width: 60px; height: 60px; font-size: 1.2rem; }
-            .btn-shift { width: 50px; height: 50px; }
-
-            /* Ensure screens are readable */
-            .screen { padding: 20px; box-sizing: border-box; }
-            .screen h1 { font-size: 1.4rem; }
-            .screen p { font-size: 0.75rem; line-height: 1.4; padding: 10px; border-width: 1px; }
+        @media (prefers-reduced-motion: reduce) {
+            #alarm-text { animation-duration: 1.6s; }
+            body.alarm #alarm-overlay { animation-duration: 2.5s; }
+            #btn-action.ready { animation: none; }
         }
     </style>
 </head>
 <body>
 
 <div id="game-container">
-    <canvas id="gameCanvas"></canvas>
+    <canvas id="gameCanvas" aria-label="O'yin maydoni"></canvas>
     <div id="alarm-overlay"></div>
-    <div id="alarm-text">DIQQAT! SIGNALIZATSIYA!</div>
+    <div id="alarm-text" role="alert">DIQQAT! SIGNALIZATSIYA!</div>
 
-    <!-- UI LAYER -->
-    <div id="hud-top" class="hidden">
-        <div class="hud-row-1">
+    <!-- HUD -->
+    <div id="hud-top" class="game-ui">
+        <div class="hud-group hud-left">
             <div class="hud-panel">
-                <span style="color:#888; font-size:0.8em;">QAVAT</span>
-                <span id="level-disp" style="font-size:1.5em">1</span>
+                <span class="hud-label">QAVAT</span>
+                <span id="level-disp" class="hud-value">1</span>
             </div>
             <div class="hud-panel">
                 <div id="inventory-panel">
-                    <div class="inv-slot" id="inv-key">🔑</div>
-                    <div class="inv-slot" id="inv-doc">📄</div>
+                    <div class="inv-slot" id="inv-key" title="Kalit">🔑</div>
+                    <div class="inv-slot" id="inv-doc" title="Hujjat">📄</div>
                 </div>
             </div>
+        </div>
+        <div id="mission-status" class="hud-panel" aria-live="polite">BOSS xonasidan KALITNI toping</div>
+        <div class="hud-group hud-right">
             <div class="hud-panel">
-                <span style="color:#888; font-size:0.8em;">VAQT</span>
-                <span id="time-disp" style="font-size:1.5em">00:00</span>
+                <span class="hud-label">VAQT</span>
+                <span id="time-disp" class="hud-value">00:00</span>
             </div>
-        </div>
-        <div id="mission-status" class="hud-panel">BOSS xonasidan KALITNI toping</div>
-        
-        <div id="hud-mobile-extras" class="hidden">
-            <div id="disguise-panel-mobile"></div>
-            <div id="minimap-wrap-mobile"></div>
+            <button type="button" class="icon-btn" data-action="pause" aria-label="Pauza">❚❚</button>
         </div>
     </div>
 
-    <div id="disguise-panel" class="hidden">
-        <div id="disguise-content">
-            <div class="avatar-box" id="avatar-box">
-                <div id="avatar-icon">👤</div>
-            </div>
-            <div style="margin-bottom: 10px;">
-                <div style="font-size: 0.9em; color: #aaa; margin-bottom:5px;">SHOVQIN DARAJASI</div>
-                <div class="noise-meter">
-                    <div class="noise-bar" id="noise-bar"></div>
-                </div>
-                <div id="outfit-name" style="margin-top:5px; font-size: 1.2em; color: #fff;">MAHBUS NIQOBI</div>
-            </div>
+    <div id="disguise-panel" class="game-ui">
+        <div class="avatar-box" id="avatar-box"><span id="avatar-icon">👤</span></div>
+        <div class="disguise-info">
+            <div class="disguise-label">SHOVQIN DARAJASI</div>
+            <div class="noise-meter"><div class="noise-bar" id="noise-bar"></div></div>
+            <div id="outfit-name">MAHBUS</div>
         </div>
     </div>
 
-    <div id="minimap-wrap" class="hidden">
+    <div id="minimap-wrap" class="game-ui">
         <canvas id="minimap"></canvas>
     </div>
 
-    <div id="mobile-controls" class="hidden">
-        <div class="joystick-zone">
-            <div class="d-pad-btn d-up" id="btn-up">▲</div>
-            <div class="d-pad-btn d-down" id="btn-down">▼</div>
-            <div class="d-pad-btn d-left" id="btn-left">◀</div>
-            <div class="d-pad-btn d-right" id="btn-right">▶</div>
+    <!-- TOUCH CONTROLS -->
+    <div id="touch-controls">
+        <div id="joy-zone" aria-label="Harakat joystigi">
+            <div id="joy-base"><div id="joy-knob"></div></div>
         </div>
-        <div class="action-zone">
-            <div class="mobile-btn btn-shift" id="btn-shift">S</div>
-            <div class="mobile-btn btn-action" id="btn-action">E</div>
+        <div id="action-zone">
+            <button type="button" class="touch-btn" id="btn-run" aria-label="Yugurish">YUGUR</button>
+            <button type="button" class="touch-btn" id="btn-action" aria-label="Harakat">
+                <span class="btn-glyph">E</span>
+                <span class="btn-sub" id="btn-action-label"></span>
+            </button>
         </div>
     </div>
 
-    <div id="notification-area"></div>
-    <div id="interaction-prompt">E</div>
-    <div id="hidden-indicator">YASHIRINGAN (KO'RINMAS)</div>
+    <div id="notification-area" class="game-ui" aria-live="assertive"></div>
+    <div id="interaction-prompt" class="hidden"></div>
+    <div id="hidden-indicator" class="hidden">YASHIRINGAN (KO'RINMAS)</div>
 
     <!-- SCREENS -->
     <div id="menu-screen" class="screen">
-        <h1>MAXFIY TUNNEL</h1>
-        <h2>QOCHISH REJASI</h2>
-        <p>
-            1. <b>BOSS xonasini</b> toping va <b>KALITNI</b> o'g'irlang.<br>
-            2. Kalit bilan <b>HUJJAT XONASIDAGI</b> yashirin eshikni oching.<br>
-            3. Hujjatni olgach <b>SIGNALIZATSIYA</b> ishga tushadi!<br>
-            4. Yashirin tunnel orqali aylanib o'tib, qochib keting.<br>
-            <br>
-            <span style="color:var(--danger)">DIQQAT:</span> Signalizatsiya vaqtida sizni kimdir ko'rsa - O'YIN TUGAYDI!
-        </p>
-        <button onclick="Game.startNew()">MISSIYANI BOSHLASH</button>
+        <div class="screen-inner">
+            <h1>MAXFIY TUNNEL</h1>
+            <h2>QOCHISH REJASI</h2>
+            <div class="card">
+                1. <b>BOSS xonasini</b> toping va <b>KALITNI</b> o'g'irlang.<br>
+                2. Kalit bilan <b>HUJJAT XONASIDAGI</b> yashirin tunnel lyukini oching.<br>
+                3. Hujjatni olgach <b>SIGNALIZATSIYA</b> ishga tushadi!<br>
+                4. Yashirin tunnel orqali aylanib o'tib, qochib keting.<br>
+                <br>
+                <span style="color:var(--primary)">MASLAHAT:</span> Soqchini <b>orqasidan</b> zararsizlantirib, niqobini oling.
+                Soqchi niqobi soqchilardan, boss niqobi esa hammadan himoya qiladi. Ventilyatsiya panjarasida turib yashirinish mumkin.<br>
+                <br>
+                <span style="color:var(--danger)">DIQQAT:</span> Signalizatsiya vaqtida sizni kimdir ko'rsa - O'YIN TUGAYDI!
+            </div>
+            <p class="controls-hint hint-desktop">
+                <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> yurish ·
+                <kbd>SHIFT</kbd> yugurish (shovqin!) ·
+                <kbd>E</kbd> / <kbd>SPACE</kbd> / sichqoncha — harakat ·
+                <kbd>P</kbd> / <kbd>ESC</kbd> pauza · Gamepad ham ishlaydi
+            </p>
+            <p class="controls-hint hint-touch">
+                Ekranning chap pastki qismida barmoq bilan suring — yurish ·
+                <b>YUGUR</b> — yugurish (shovqin!) · <b>E</b> — harakat · <b>❚❚</b> — pauza
+            </p>
+            <div class="btn-row">
+                <button type="button" class="menu-btn" data-action="start" data-primary>MISSIYANI BOSHLASH</button>
+                <button type="button" class="menu-btn secondary" data-action="fullscreen">TO'LIQ EKRAN</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pause-screen" class="screen hidden">
+        <div class="screen-inner">
+            <h1 class="pause">PAUZA</h1>
+            <div class="btn-row">
+                <button type="button" class="menu-btn" data-action="resume" data-primary>DAVOM ETISH</button>
+                <button type="button" class="menu-btn secondary" data-action="retry">QAYTA BOSHLASH</button>
+                <button type="button" class="menu-btn secondary" data-action="fullscreen">TO'LIQ EKRAN</button>
+                <button type="button" class="menu-btn secondary" data-action="menu">MENYU</button>
+            </div>
+        </div>
     </div>
 
     <div id="gameover-screen" class="screen hidden">
-        <h1 style="color: var(--danger); text-shadow: 0 0 30px red;">MISSIA BARBOD BO'LDI</h1>
-        <p id="fail-reason">Sizni payqab qolishdi.</p>
-        <button onclick="Game.retry()">QAYTA URINISH</button>
-        <button onclick="Game.toMenu()" style="border-color: #555; color: #888;">MENYU</button>
+        <div class="screen-inner">
+            <h1 style="text-shadow: 0 0 30px red;">MISSIYA BARBOD BO'LDI</h1>
+            <div class="card center" id="fail-reason">Sizni payqab qolishdi.</div>
+            <div class="btn-row">
+                <button type="button" class="menu-btn" data-action="retry" data-primary>QAYTA URINISH</button>
+                <button type="button" class="menu-btn secondary" data-action="menu">MENYU</button>
+            </div>
+        </div>
     </div>
 
     <div id="win-screen" class="screen hidden">
-        <h1 style="color: var(--warning); text-shadow: 0 0 30px orange;">MISSIA BAJARILDI</h1>
-        <p>Hujjat xavfsiz joyda. Ajoyib ish!</p>
-        <button onclick="Game.nextLevel()">KEYINGI QAVAT</button>
+        <div class="screen-inner">
+            <h1 class="win">MISSIYA BAJARILDI</h1>
+            <div class="card center">Hujjat xavfsiz joyda. Ajoyib ish!<br>Vaqt: <span id="win-time">00:00</span></div>
+            <div class="btn-row">
+                <button type="button" class="menu-btn" data-action="next" data-primary>KEYINGI QAVAT</button>
+                <button type="button" class="menu-btn secondary" data-action="menu">MENYU</button>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
-const Game = (function() {
-    const canvas = document.getElementById('gameCanvas');
+const Game = (function () {
+    'use strict';
+
+    const $ = (id) => document.getElementById(id);
+    const body = document.body;
+    const container = $('game-container');
+    const canvas = $('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const mmCanvas = document.getElementById('minimap');
+    const mmCanvas = $('minimap');
     const mmCtx = mmCanvas.getContext('2d');
 
-    // UI Refs
     const ui = {
         screens: {
-            menu: document.getElementById('menu-screen'),
-            gameover: document.getElementById('gameover-screen'),
-            win: document.getElementById('win-screen')
+            menu: $('menu-screen'),
+            pause: $('pause-screen'),
+            gameover: $('gameover-screen'),
+            win: $('win-screen')
         },
-        hudTop: document.getElementById('hud-top'),
-        disguisePanel: document.getElementById('disguise-panel'),
-        minimapWrap: document.getElementById('minimap-wrap'),
-        levelDisp: document.getElementById('level-disp'),
-        timeDisp: document.getElementById('time-disp'),
-        missionStatus: document.getElementById('mission-status'),
-        avatarIcon: document.getElementById('avatar-icon'),
-        avatarBox: document.getElementById('avatar-box'),
-        noiseBar: document.getElementById('noise-bar'),
-        outfitName: document.getElementById('outfit-name'),
-        notifArea: document.getElementById('notification-area'),
-        prompt: document.getElementById('interaction-prompt'),
-        failReason: document.getElementById('fail-reason'),
-        hiddenIndicator: document.getElementById('hidden-indicator'),
-        alarmOverlay: document.getElementById('alarm-overlay'),
-        alarmText: document.getElementById('alarm-text'),
-        invKey: document.getElementById('inv-key'),
-        invDoc: document.getElementById('inv-doc')
+        hudTop: $('hud-top'),
+        minimapWrap: $('minimap-wrap'),
+        levelDisp: $('level-disp'),
+        timeDisp: $('time-disp'),
+        missionStatus: $('mission-status'),
+        avatarIcon: $('avatar-icon'),
+        avatarBox: $('avatar-box'),
+        noiseBar: $('noise-bar'),
+        outfitName: $('outfit-name'),
+        notifArea: $('notification-area'),
+        prompt: $('interaction-prompt'),
+        failReason: $('fail-reason'),
+        winTime: $('win-time'),
+        hiddenIndicator: $('hidden-indicator'),
+        invKey: $('inv-key'),
+        invDoc: $('inv-doc'),
+        joyZone: $('joy-zone'),
+        joyBase: $('joy-base'),
+        joyKnob: $('joy-knob'),
+        btnAction: $('btn-action'),
+        btnActionLabel: $('btn-action-label'),
+        btnRun: $('btn-run')
     };
 
-    // Constants
+    // ---------- CONSTANTS ----------
     const TILE = 64;
+    const STEP = 1 / 60;          // fixed simulation step (all speeds are tuned per 60Hz tick)
+    const MAX_FRAME = 0.25;       // avoid spiral of death after tab switch
+    const PLAYER_R = 12;
+    const ENEMY_R = 12;
+    const BASE_VIEW = 720;        // world px guaranteed to be visible on the short screen side
+
     const COLORS = {
-        wall: '#222', 
+        wall: '#222',
         floor: '#3a3a3a',
         bossFloor: '#400000',
-        secureFloor: '#1a3a4a',
-        tunnelFloor: '#2a2a2a'
-    };
-    
-    const TYPES = {
-        CIVILIAN: { id: 0, name: 'MAHBUS', color: '#ffa500', rank: 0, viewDist: 200, viewAngle: 1.2 }, 
-        GUARD:    { id: 1, name: 'SOQCHI', color: '#4488ff', rank: 1, viewDist: 320, viewAngle: 1.6 },
-        BOSS:     { id: 2, name: 'BOSS', color: '#ff0000', rank: 2, viewDist: 450, viewAngle: 2.2 } 
+        secureFloor: '#1a3a4a'
     };
 
-    // State
-    let state = {
-        active: false,
+    const TYPES = {
+        CIVILIAN: { id: 0, name: 'MAHBUS', color: '#ffa500', rank: 0, viewDist: 200, viewAngle: 1.2 },
+        GUARD:    { id: 1, name: 'SOQCHI', color: '#4488ff', rank: 1, viewDist: 320, viewAngle: 1.6 },
+        BOSS:     { id: 2, name: 'BOSS',   color: '#ff0000', rank: 2, viewDist: 450, viewAngle: 2.2 }
+    };
+
+    // ---------- STATE ----------
+    const view = { w: 1, h: 1, dpr: 1, zoom: 1 };
+    const state = {
+        mode: 'menu',             // menu | playing | paused | gameover | win
         level: 1,
-        width: 100, height: 100,
-        camera: {x: 0, y: 0},
-        startTime: 0,
+        camera: { x: 0, y: 0, px: 0, py: 0 },
+        elapsed: 0,
         hasKey: false,
         hasDocument: false,
         tunnelOpen: false,
-        alarmTriggered: false,
-        bossRoom: null
+        alarm: false,
+        interaction: null
     };
 
-    let map = []; // 1=Wall, 0=Floor, 2=BossFloor, 3=SecureFloor, 4=TunnelFloor
+    let map = [];                 // 1=Wall, 0=Floor, 2=BossFloor, 3=SecureFloor
     let entities = [];
+    let enemies = [];
     let particles = [];
-    let player = { 
-        x: 0, y: 0, angle: 0, 
-        disguise: TYPES.CIVILIAN, 
-        noise: 0, 
+    const player = {
+        x: 0, y: 0, px: 0, py: 0, angle: 0,
+        disguise: TYPES.CIVILIAN,
+        noise: 0,
         maxSpeed: 4,
         isHidden: false
     };
-    
-    const keys = {};
-    const mouse = { x: 0, y: 0 };
 
-    function init() {
-        resize();
-        window.addEventListener('resize', resize);
-        
-        // Keyboard
-        window.addEventListener('keydown', e => {
-            keys[e.code] = true;
-            if(e.code === 'KeyE') interact();
-        });
-        window.addEventListener('keyup', e => keys[e.code] = false);
-        
-        // Mouse
-        window.addEventListener('mousemove', e => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
-        });
+    const input = {
+        mode: 'desktop',          // desktop | touch
+        keys: Object.create(null),
+        mouse: { x: 0, y: 0, active: false },
+        joy: { id: null, x: 0, y: 0, cx: 0, cy: 0 },
+        runHeld: false,
+        pad: { x: 0, y: 0, run: false, prevA: false, prevStart: false }
+    };
 
-        // Touch Controls
-        const setupTouchBtn = (id, keyCode) => {
-            const btn = document.getElementById(id);
-            const handleStart = (e) => {
-                e.preventDefault();
-                keys[keyCode] = true;
-                btn.classList.add('active-btn');
-                if(keyCode === 'KeyE') interact();
-            };
-            const handleEnd = (e) => {
-                e.preventDefault();
-                keys[keyCode] = false;
-                btn.classList.remove('active-btn');
-            };
-            btn.addEventListener('touchstart', handleStart);
-            btn.addEventListener('touchend', handleEnd);
-            btn.addEventListener('touchcancel', handleEnd);
-            
-            // Mouse fallback for testing
-            btn.addEventListener('mousedown', () => { keys[keyCode] = true; if(keyCode === 'KeyE') interact(); });
-            btn.addEventListener('mouseup', () => { keys[keyCode] = false; });
-        };
+    // ---------- UTILS ----------
+    const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const normalizeAngle = (a) => a - (2 * Math.PI) * Math.floor((a + Math.PI) / (2 * Math.PI));
+    const lerpAngle = (a, b, t) => a + normalizeAngle(b - a) * t;
+    const tileCenter = (c, r) => ({ x: (c + 0.5) * TILE, y: (r + 0.5) * TILE });
+    const formatTime = (sec) => {
+        const s = Math.floor(sec);
+        return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    };
+    const buzz = (pattern) => {
+        if (input.mode !== 'touch' || !navigator.vibrate) return;
+        try { navigator.vibrate(pattern); } catch (_) { /* unsupported */ }
+    };
 
-        setupTouchBtn('btn-up', 'KeyW');
-        setupTouchBtn('btn-down', 'KeyS');
-        setupTouchBtn('btn-left', 'KeyA');
-        setupTouchBtn('btn-right', 'KeyD');
-        setupTouchBtn('btn-action', 'KeyE');
-        setupTouchBtn('btn-shift', 'ShiftLeft');
-
-        // Touch Rotation Support
-        window.addEventListener('touchstart', e => {
-            if (e.target.closest('#mobile-controls')) return;
-            updateTouchPos(e.touches[0]);
-        }, { passive: false });
-
-        window.addEventListener('touchmove', e => {
-            if (e.target.closest('#mobile-controls')) return;
-            updateTouchPos(e.touches[0]);
-        }, { passive: false });
-
-        function updateTouchPos(touch) {
-            mouse.x = touch.clientX;
-            mouse.y = touch.clientY;
-        }
-
-        requestAnimationFrame(loop);
+    function isWall(x, y) {
+        const c = Math.floor(x / TILE);
+        const r = Math.floor(y / TILE);
+        if (r < 0 || r >= map.length || c < 0 || c >= map[0].length) return true;
+        return map[r][c] === 1;
     }
 
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        state.width = canvas.width;
-        state.height = canvas.height;
-        
-        // Resize minimap
-        const activeMmWrap = (window.innerWidth <= 768) ? 
-            document.getElementById('minimap-wrap-mobile') : 
-            document.getElementById('minimap-wrap');
-            
-        if (activeMmWrap) {
-            mmCanvas.width = activeMmWrap.clientWidth;
-            mmCanvas.height = activeMmWrap.clientHeight;
-        }
-
-        // Redraw immediately to avoid flickering/black screen on resize
-        if(state.active) draw();
+    function collides(x, y, rad) {
+        return isWall(x - rad, y - rad) || isWall(x + rad, y - rad) ||
+               isWall(x - rad, y + rad) || isWall(x + rad, y + rad);
     }
 
-    // --- MAP GENERATION ---
-    function generateLevel(lvl) {
+    function rayCast(x1, y1, x2, y2) {
+        const d = Math.hypot(x2 - x1, y2 - y1);
+        const steps = Math.max(1, Math.ceil(d / 20));
+        const dx = (x2 - x1) / steps;
+        const dy = (y2 - y1) / steps;
+        for (let i = 1; i < steps; i++) {
+            if (isWall(x1 + dx * i, y1 + dy * i)) return true;
+        }
+        return false;
+    }
+
+    // ---------- INPUT ----------
+    function setInputMode(mode) {
+        if (input.mode === mode) return;
+        input.mode = mode;
+        body.classList.toggle('touch-mode', mode === 'touch');
+        releaseInputs();
+        layout();
+    }
+
+    function releaseInputs() {
+        for (const k in input.keys) input.keys[k] = false;
+        input.runHeld = false;
+        ui.btnRun.classList.remove('pressed');
+        ui.btnAction.classList.remove('pressed');
+        resetJoystick();
+    }
+
+    function resetJoystick() {
+        input.joy.id = null;
+        input.joy.x = 0;
+        input.joy.y = 0;
+        const rad = ui.joyBase.offsetWidth / 2 || 70;
+        const zh = ui.joyZone.clientHeight || 300;
+        ui.joyBase.style.left = (rad + 20) + 'px';
+        ui.joyBase.style.top = (zh - rad - 20) + 'px';
+        ui.joyBase.classList.remove('active');
+        ui.joyKnob.style.transform = 'translate(0px, 0px)';
+    }
+
+    function setupJoystick() {
+        const zone = ui.joyZone;
+        zone.addEventListener('pointerdown', (e) => {
+            if (input.joy.id !== null) return;
+            e.preventDefault();
+            try { zone.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+            input.joy.id = e.pointerId;
+            const r = zone.getBoundingClientRect();
+            const rad = ui.joyBase.offsetWidth / 2;
+            const lx = clamp(e.clientX - r.left, rad, Math.max(rad, r.width - rad));
+            const ly = clamp(e.clientY - r.top, rad, Math.max(rad, r.height - rad));
+            ui.joyBase.style.left = lx + 'px';
+            ui.joyBase.style.top = ly + 'px';
+            ui.joyBase.classList.add('active');
+            input.joy.cx = r.left + lx;
+            input.joy.cy = r.top + ly;
+            moveJoystick(e.clientX, e.clientY);
+        });
+        zone.addEventListener('pointermove', (e) => {
+            if (e.pointerId !== input.joy.id) return;
+            e.preventDefault();
+            moveJoystick(e.clientX, e.clientY);
+        });
+        const end = (e) => { if (e.pointerId === input.joy.id) resetJoystick(); };
+        zone.addEventListener('pointerup', end);
+        zone.addEventListener('pointercancel', end);
+        zone.addEventListener('lostpointercapture', end);
+    }
+
+    function moveJoystick(clientX, clientY) {
+        const maxR = ui.joyBase.offsetWidth * 0.36;
+        let dx = clientX - input.joy.cx;
+        let dy = clientY - input.joy.cy;
+        const d = Math.hypot(dx, dy);
+        if (d > maxR) { dx *= maxR / d; dy *= maxR / d; }
+        ui.joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        const mag = Math.min(1, d / maxR);
+        const DEAD = 0.18;
+        if (mag < DEAD || d === 0) { input.joy.x = 0; input.joy.y = 0; return; }
+        const scaled = (mag - DEAD) / (1 - DEAD);
+        input.joy.x = (dx / Math.hypot(dx, dy)) * scaled;
+        input.joy.y = (dy / Math.hypot(dx, dy)) * scaled;
+    }
+
+    function setupTouchButtons() {
+        const act = ui.btnAction;
+        act.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            act.classList.add('pressed');
+            interact();
+        });
+        const actUp = () => act.classList.remove('pressed');
+        act.addEventListener('pointerup', actUp);
+        act.addEventListener('pointercancel', actUp);
+        act.addEventListener('pointerleave', actUp);
+
+        const run = ui.btnRun;
+        run.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            try { run.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+            input.runHeld = true;
+            run.classList.add('pressed');
+        });
+        const runUp = () => { input.runHeld = false; run.classList.remove('pressed'); };
+        run.addEventListener('pointerup', runUp);
+        run.addEventListener('pointercancel', runUp);
+        run.addEventListener('lostpointercapture', runUp);
+
+        $('touch-controls').addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+
+    const PREVENT_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
+
+    function setupKeyboardAndMouse() {
+        window.addEventListener('keydown', (e) => {
+            if (input.mode !== 'desktop') setInputMode('desktop');
+            input.keys[e.code] = true;
+            if (state.mode === 'playing') {
+                if (PREVENT_KEYS.has(e.code)) e.preventDefault();
+                if (e.repeat) return;
+                if (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); interact(); }
+                else if (e.code === 'KeyP' || e.code === 'Escape') pause();
+            } else if (state.mode === 'paused' && !e.repeat && (e.code === 'KeyP' || e.code === 'Escape')) {
+                e.preventDefault();
+                resume();
+            }
+        });
+        window.addEventListener('keyup', (e) => { input.keys[e.code] = false; });
+
+        window.addEventListener('pointerdown', (e) => {
+            setInputMode(e.pointerType === 'mouse' ? 'desktop' : 'touch');
+        }, { capture: true, passive: true });
+
+        window.addEventListener('pointermove', (e) => {
+            if (e.pointerType !== 'mouse') return;
+            input.mouse.x = e.clientX;
+            input.mouse.y = e.clientY;
+            input.mouse.active = true;
+            if (input.mode !== 'desktop') setInputMode('desktop');
+        }, { passive: true });
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button === 0 && state.mode === 'playing') interact();
+        });
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        window.addEventListener('blur', () => { releaseInputs(); pause(); });
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) { releaseInputs(); pause(); }
+        });
+    }
+
+    function pollGamepad() {
+        const pad = input.pad;
+        pad.x = 0; pad.y = 0; pad.run = false;
+        if (!navigator.getGamepads) return;
+        let gp = null;
+        const pads = navigator.getGamepads();
+        for (let i = 0; i < pads.length; i++) { if (pads[i] && pads[i].connected) { gp = pads[i]; break; } }
+        if (!gp) return;
+
+        const b = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+        let x = gp.axes[0] || 0;
+        let y = gp.axes[1] || 0;
+        const m = Math.hypot(x, y);
+        if (m < 0.2) { x = 0; y = 0; } else { const s = Math.min(1, (m - 0.2) / 0.8) / m; x *= s; y *= s; }
+        if (b(14)) x = -1;
+        if (b(15)) x = 1;
+        if (b(12)) y = -1;
+        if (b(13)) y = 1;
+        const dm = Math.hypot(x, y);
+        if (dm > 1) { x /= dm; y /= dm; }
+        pad.x = x; pad.y = y;
+        pad.run = b(1) || b(5) || b(7) || b(10);
+
+        const a = b(0);
+        const start = b(9);
+        if (x || y || a || start || pad.run) {
+            if (input.mode !== 'desktop') setInputMode('desktop');
+            input.mouse.active = false;
+        }
+        if (a && !pad.prevA) {
+            if (state.mode === 'playing') interact();
+            else if (state.mode === 'paused') resume();
+            else {
+                const btn = visiblePrimaryButton();
+                if (btn) btn.click();
+            }
+        }
+        if (start && !pad.prevStart) {
+            if (state.mode === 'playing') pause();
+            else if (state.mode === 'paused') resume();
+        }
+        pad.prevA = a;
+        pad.prevStart = start;
+    }
+
+    function getMoveVector() {
+        if (input.joy.id !== null && (input.joy.x || input.joy.y)) return { x: input.joy.x, y: input.joy.y };
+        if (input.pad.x || input.pad.y) return { x: input.pad.x, y: input.pad.y };
+        const k = input.keys;
+        let x = 0, y = 0;
+        if (k.KeyW || k.ArrowUp) y -= 1;
+        if (k.KeyS || k.ArrowDown) y += 1;
+        if (k.KeyA || k.ArrowLeft) x -= 1;
+        if (k.KeyD || k.ArrowRight) x += 1;
+        if (x && y) { x *= Math.SQRT1_2; y *= Math.SQRT1_2; }
+        return { x, y };
+    }
+
+    const isRunHeld = () => !!(input.keys.ShiftLeft || input.keys.ShiftRight || input.runHeld || input.pad.run);
+
+    // ---------- LAYOUT ----------
+    let layoutQueued = false;
+    function queueLayout() {
+        if (layoutQueued) return;
+        layoutQueued = true;
+        requestAnimationFrame(() => { layoutQueued = false; layout(); });
+    }
+
+    function layout() {
+        const w = Math.max(1, container.clientWidth);
+        const h = Math.max(1, container.clientHeight);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        view.w = w; view.h = h; view.dpr = dpr;
+        // Small screens zoom out so the player sees roughly the same world area as on desktop.
+        view.zoom = clamp(Math.min(w, h) / BASE_VIEW, 0.5, 1);
+
+        const cw = Math.round(w * dpr), ch = Math.round(h * dpr);
+        if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+
+        const hudH = body.classList.contains('in-game') ? ui.hudTop.offsetHeight : 0;
+        document.documentElement.style.setProperty('--hud-h', hudH + 'px');
+
+        const mw = Math.round(mmCanvas.clientWidth * dpr);
+        const mh = Math.round(mmCanvas.clientHeight * dpr);
+        if (mw > 0 && mh > 0 && (mmCanvas.width !== mw || mmCanvas.height !== mh)) {
+            mmCanvas.width = mw; mmCanvas.height = mh;
+        }
+
+        if (input.joy.id === null) resetJoystick();
+        if (state.mode !== 'menu') render(1);
+    }
+
+    // ---------- LEVEL GENERATION ----------
+    function tryGenerate(lvl) {
         const size = Math.min(30 + lvl * 2, 80);
         const enemyCount = 7 + Math.floor(lvl * 1.5);
-        
-        let newMap = Array(size).fill().map(() => Array(size).fill(1));
-        let rooms = [];
+        const newMap = Array.from({ length: size }, () => Array(size).fill(1));
+        const rooms = [];
 
-        // 1. Create Rooms
-        const roomAttempts = 40;
-        for(let i=0; i<roomAttempts; i++) {
-            let w = Math.floor(Math.random() * 4) + 5; 
-            let h = Math.floor(Math.random() * 4) + 5; 
-            let x = Math.floor(Math.random() * (size - w - 2)) + 1;
-            let y = Math.floor(Math.random() * (size - h - 2)) + 1;
-
+        for (let i = 0; i < 40; i++) {
+            const w = Math.floor(Math.random() * 4) + 5;
+            const h = Math.floor(Math.random() * 4) + 5;
+            const x = Math.floor(Math.random() * (size - w - 2)) + 1;
+            const y = Math.floor(Math.random() * (size - h - 2)) + 1;
             let overlap = false;
-            for(let r of rooms) {
-                if (x < r.x + r.w + 1 && x + w + 1 > r.x &&
-                    y < r.y + r.h + 1 && y + h + 1 > r.y) {
-                    overlap = true;
-                    break;
-                }
+            for (const r of rooms) {
+                if (x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y) { overlap = true; break; }
             }
-            if(!overlap) {
-                rooms.push({x, y, w, h});
-                for(let ry=y; ry<y+h; ry++) {
-                    for(let rx=x; rx<x+w; rx++) {
-                        newMap[ry][rx] = 0;
-                    }
-                }
-            }
+            if (overlap) continue;
+            rooms.push({ x, y, w, h });
+            for (let ry = y; ry < y + h; ry++) for (let rx = x; rx < x + w; rx++) newMap[ry][rx] = 0;
+        }
+        if (rooms.length < 3) return null;
+
+        // Corridors (2 tiles wide)
+        for (let i = 0; i < rooms.length - 1; i++) {
+            const r1 = rooms[i], r2 = rooms[i + 1];
+            let x = Math.floor(r1.x + r1.w / 2), y = Math.floor(r1.y + r1.h / 2);
+            const tx = Math.floor(r2.x + r2.w / 2), ty = Math.floor(r2.y + r2.h / 2);
+            while (x !== tx) { newMap[y][x] = 0; newMap[y + 1][x] = 0; x += tx > x ? 1 : -1; }
+            while (y !== ty) { newMap[y][x] = 0; newMap[y][x + 1] = 0; y += ty > y ? 1 : -1; }
         }
 
-        // 2. Connect Rooms
-        for(let i=0; i<rooms.length-1; i++) {
-            let r1 = rooms[i];
-            let r2 = rooms[i+1];
-            let c1 = {x: Math.floor(r1.x + r1.w/2), y: Math.floor(r1.y + r1.h/2)};
-            let c2 = {x: Math.floor(r2.x + r2.w/2), y: Math.floor(r2.y + r2.h/2)};
-
-            let x = c1.x; let y = c1.y;
-            while(x !== c2.x) { newMap[y][x] = 0; newMap[y+1][x] = 0; x += (c2.x > x ? 1 : -1); }
-            while(y !== c2.y) { newMap[y][x] = 0; newMap[y][x+1] = 0; y += (c2.y > y ? 1 : -1); }
+        const startRoom = rooms[0];
+        let bossRoom = rooms[rooms.length - 1];
+        let maxD = -1;
+        for (const r of rooms) {
+            const d = Math.hypot(r.x - startRoom.x, r.y - startRoom.y);
+            if (d > maxD) { maxD = d; bossRoom = r; }
         }
+        const others = rooms
+            .filter((r) => r !== startRoom && r !== bossRoom)
+            .sort((a, b) => Math.hypot(a.x - startRoom.x, a.y - startRoom.y) - Math.hypot(b.x - startRoom.x, b.y - startRoom.y));
+        const docRoom = others[Math.floor(others.length / 2)];
 
-        // 3. Assign Special Rooms
-        let startRoom = rooms[0];
-        
-        // Find Furthest room for BOSS (Key)
-        let bossRoom = rooms[rooms.length-1];
-        let maxDist = 0;
-        for(let r of rooms) {
-            let d = Math.hypot(r.x - startRoom.x, r.y - startRoom.y);
-            if(d > maxDist) { maxDist = d; bossRoom = r; }
-        }
-
-        // Find another room for DOCUMENT (Mid range)
-        let docRoom = rooms[Math.floor(rooms.length/2)];
-        // Ensure docRoom is not bossRoom or startRoom
-        if(docRoom === bossRoom || docRoom === startRoom) docRoom = rooms[rooms.length-2];
-
-        // Mark Floors
-        for(let ry=bossRoom.y; ry<bossRoom.y+bossRoom.h; ry++) {
-            for(let rx=bossRoom.x; rx<bossRoom.x+bossRoom.w; rx++) newMap[ry][rx] = 2; // Boss Floor
-        }
-        for(let ry=docRoom.y; ry<docRoom.y+docRoom.h; ry++) {
-            for(let rx=docRoom.x; rx<docRoom.x+docRoom.w; rx++) newMap[ry][rx] = 3; // Secure Floor
-        }
+        for (let ry = bossRoom.y; ry < bossRoom.y + bossRoom.h; ry++)
+            for (let rx = bossRoom.x; rx < bossRoom.x + bossRoom.w; rx++) newMap[ry][rx] = 2;
+        for (let ry = docRoom.y; ry < docRoom.y + docRoom.h; ry++)
+            for (let rx = docRoom.x; rx < docRoom.x + docRoom.w; rx++) newMap[ry][rx] = 3;
 
         return { map: newMap, rooms, startRoom, bossRoom, docRoom, enemyCount };
+    }
+
+    function generateLevel(lvl) {
+        for (let i = 0; i < 200; i++) {
+            const g = tryGenerate(lvl);
+            if (g) return g;
+        }
+        throw new Error('Level generation failed');
     }
 
     function startGame(level) {
@@ -761,649 +1131,825 @@ const Game = (function() {
         const gen = generateLevel(level);
         map = gen.map;
         entities = [];
+        enemies = [];
         particles = [];
 
-        // Reset State
         state.hasKey = false;
         state.hasDocument = false;
         state.tunnelOpen = false;
-        state.alarmTriggered = false;
-        state.bossRoom = gen.bossRoom;
+        state.alarm = false;
+        state.elapsed = 0;
+        state.interaction = null;
+        body.classList.remove('alarm');
 
         ui.invKey.classList.remove('inv-active');
         ui.invDoc.classList.remove('inv-active');
-        ui.invKey.style.opacity = '0.3';
-        ui.invDoc.style.opacity = '0.3';
+        ui.notifArea.textContent = '';
+        ui.missionStatus.classList.remove('alarm-text-color');
 
-        // Player
-        player.x = (gen.startRoom.x + gen.startRoom.w/2) * TILE;
-        player.y = (gen.startRoom.y + gen.startRoom.h/2) * TILE;
+        const sr = gen.startRoom, br = gen.bossRoom, dr = gen.docRoom;
+        const occupied = new Set();
+        const occupy = (c, r) => { occupied.add(c + ',' + r); return tileCenter(c, r); };
+
+        const spawn = occupy(sr.x + Math.floor(sr.w / 2), sr.y + Math.floor(sr.h / 2));
+        player.x = player.px = spawn.x;
+        player.y = player.py = spawn.y;
+        player.angle = 0;
+        player.noise = 0;
         player.disguise = TYPES.CIVILIAN;
         player.isHidden = false;
-        state.camera.x = player.x - state.width/2;
-        state.camera.y = player.y - state.height/2;
-
         updateDisguiseUI();
 
-        // 1. KEY (In Boss Room)
-        entities.push({
-            type: 'KEY',
-            x: (gen.bossRoom.x + gen.bossRoom.w/2) * TILE,
-            y: (gen.bossRoom.y + gen.bossRoom.h/2) * TILE,
-            active: true
-        });
+        // 1. KEY (boss room)
+        const keyPos = occupy(br.x + Math.floor(br.w / 2), br.y + Math.floor(br.h / 2));
+        entities.push({ type: 'KEY', x: keyPos.x, y: keyPos.y, active: true });
 
-        // 2. DOCUMENT (In Doc Room)
-        entities.push({
-            type: 'DOCUMENT',
-            x: (gen.docRoom.x + gen.docRoom.w/2) * TILE,
-            y: (gen.docRoom.y + gen.docRoom.h/2) * TILE,
-            active: true
-        });
+        // 2. DOCUMENT (secure room)
+        const docPos = occupy(dr.x + Math.floor(dr.w / 2), dr.y + Math.floor(dr.h / 2));
+        entities.push({ type: 'DOCUMENT', x: docPos.x, y: docPos.y, active: true });
 
-        // 3. SECRET DOOR (In Doc Room wall)
-        // Find a spot on the wall of doc room to place secret door
-        let doorX = gen.docRoom.x * TILE;
-        let doorY = (gen.docRoom.y + Math.floor(gen.docRoom.h/2)) * TILE;
-        entities.push({
-            type: 'SECRET_DOOR',
-            x: doorX, y: doorY,
-            active: true // active means closed/locked
-        });
+        // 3. SECRET TUNNEL HATCH — inner corner of the secure room (never blocks corridors)
+        const hatchPos = occupy(dr.x, dr.y);
+        const tunnelExit = occupy(sr.x, sr.y);
+        entities.push({ type: 'SECRET_DOOR', x: hatchPos.x, y: hatchPos.y, active: true, targetX: tunnelExit.x, targetY: tunnelExit.y });
 
-        // 4. TUNNEL EXIT POINT (Near Start)
-        let tunnelExitX = (gen.startRoom.x + 1) * TILE;
-        let tunnelExitY = (gen.startRoom.y + 1) * TILE;
+        // 4. MAIN EXIT (start room centre, activates after the document is stolen)
+        entities.push({ type: 'EXIT', x: spawn.x, y: spawn.y, active: false });
 
-        // Add reference to door for teleport logic
-        let door = entities.find(e => e.type === 'SECRET_DOOR');
-        door.targetX = tunnelExitX;
-        door.targetY = tunnelExitY;
-
-        // 5. MAIN EXIT
-        entities.push({
-            type: 'EXIT',
-            x: (gen.startRoom.x + gen.startRoom.w/2) * TILE,
-            y: (gen.startRoom.y + gen.startRoom.h/2) * TILE,
-            active: false
-        });
-
-        // Vents
-        for(let i=0; i<8; i++) {
-            let r = gen.rooms[Math.floor(Math.random() * gen.rooms.length)];
-            entities.push({ type: 'VENT', x: (r.x+1)*TILE, y: (r.y+1)*TILE });
+        // 5. VENTS — hiding spots in room corners
+        let vents = 0;
+        for (let t = 0; t < 80 && vents < 8; t++) {
+            const r = gen.rooms[Math.floor(Math.random() * gen.rooms.length)];
+            const corners = [[r.x, r.y], [r.x + r.w - 1, r.y], [r.x, r.y + r.h - 1], [r.x + r.w - 1, r.y + r.h - 1]];
+            const [c, rr] = corners[Math.floor(Math.random() * 4)];
+            if (occupied.has(c + ',' + rr)) continue;
+            const p = occupy(c, rr);
+            entities.push({ type: 'VENT', x: p.x, y: p.y });
+            vents++;
         }
 
-        // Enemies
-        for(let i=0; i<gen.enemyCount; i++) {
-            let r = gen.rooms[Math.floor(Math.random() * gen.rooms.length)];
-            let ex = (r.x + Math.random()*r.w) * TILE;
-            let ey = (r.y + Math.random()*r.h) * TILE;
-            
-            if(dist({x:ex, y:ey}, player) > 400) { 
-                let isBoss = r === gen.bossRoom;
-                entities.push({
-                    type: 'ENEMY',
-                    subtype: isBoss ? TYPES.BOSS : TYPES.GUARD,
-                    x: ex, y: ey,
-                    angle: Math.random() * 6.28,
-                    state: 'PATROL',
-                    alert: 0,
-                    stunned: 0,
-                    pathTimer: 0,
-                    targetX: ex, targetY: ey
-                });
-            }
+        // 6. ENEMIES — one guaranteed boss guarding the key
+        const randomPointInRoom = (r) => ({
+            x: (r.x + 0.5 + Math.random() * (r.w - 1)) * TILE,
+            y: (r.y + 0.5 + Math.random() * (r.h - 1)) * TILE
+        });
+        const addEnemy = (p, subtype) => {
+            enemies.push({
+                type: 'ENEMY', subtype,
+                x: p.x, y: p.y, px: p.x, py: p.y,
+                angle: Math.random() * Math.PI * 2,
+                state: 'PATROL', alert: 0, stunned: 0,
+                pathTimer: 0, wait: 0, stuck: 0,
+                targetX: p.x, targetY: p.y
+            });
+        };
+        addEnemy(randomPointInRoom(br), TYPES.BOSS);
+        let placed = 1;
+        for (let t = 0; placed < gen.enemyCount && t < gen.enemyCount * 30; t++) {
+            const r = gen.rooms[Math.floor(Math.random() * gen.rooms.length)];
+            if (r === sr) continue;
+            const p = randomPointInRoom(r);
+            if (dist(p, player) < 400 || collides(p.x, p.y, ENEMY_R)) continue;
+            addEnemy(p, r === br ? TYPES.BOSS : TYPES.GUARD);
+            placed++;
         }
 
-        state.startTime = Date.now();
-        state.active = true;
-
+        state.mode = 'playing';
         showScreen('game');
-        resize(); // Ensure canvases are sized correctly after being shown
+        snapCamera();
+
         ui.missionStatus.innerHTML = "BOSS XONASIDAN <span style='color:cyan'>KALITNI</span> TOPING";
-        ui.alarmOverlay.style.animation = 'none';
-        ui.alarmText.style.display = 'none';
-        ui.levelDisp.innerText = state.level;
+        ui.levelDisp.textContent = String(state.level);
+        resetClock();
     }
 
-    function triggerAlarm() {
-        state.alarmTriggered = true;
-        ui.alarmOverlay.style.animation = 'alarmPulse 1s infinite';
-        ui.alarmText.style.display = 'block';
-        
-        ui.missionStatus.innerHTML = "TUNNEL ORQALI QOCHING! TEZROQ!";
-        ui.missionStatus.style.color = "red";
+    function snapCamera() {
+        const c = state.camera;
+        c.x = c.px = player.x - view.w / view.zoom / 2;
+        c.y = c.py = player.y - view.h / view.zoom / 2;
+    }
 
-        // Enemies rush to Document Room initially
-        let docInfo = entities.find(e => e.type === 'DOCUMENT'); // old pos
-        // But doc is gone, so let's use player pos or just random search
-        
-        entities.forEach(e => {
-            if(e.type === 'ENEMY') {
-                e.state = 'ALARM_RESPONSE';
-                e.alert = 50; 
-                e.targetX = player.x; 
-                e.targetY = player.y;
+    // ---------- GAMEPLAY ----------
+    function triggerAlarm() {
+        state.alarm = true;
+        body.classList.add('alarm');
+        ui.missionStatus.innerHTML = 'TUNNEL ORQALI QOCHING! TEZROQ!';
+        ui.missionStatus.classList.add('alarm-text-color');
+        buzz([120, 60, 120]);
+        for (const e of enemies) {
+            e.state = 'ALARM_RESPONSE';
+            e.alert = Math.max(e.alert, 50);
+            e.targetX = player.x;
+            e.targetY = player.y;
+            e.pathTimer = 180;
+            e.wait = 0;
+        }
+    }
+
+    function findInteraction() {
+        let best = null;
+        let bestD = Infinity;
+        const consider = (e, d, label, short, run) => {
+            if (d < bestD) { bestD = d; best = { e, label, short, run }; }
+        };
+
+        for (const e of entities) {
+            const d = dist(player, e);
+            if (d >= TILE) continue;
+            switch (e.type) {
+                case 'KEY':
+                    if (e.active) consider(e, d, 'KALITNI OLISH', 'OLISH', () => pickKey(e));
+                    break;
+                case 'SECRET_DOOR':
+                    if (!e.active) break;
+                    if (state.hasKey) consider(e, d, 'TUNNELNI OCHISH', 'OCHISH', () => openTunnel(e));
+                    else consider(e, d, 'QULFLANGAN (KALIT KERAK)', 'QULF', () => showNotification('KALIT KERAK!', 'red'));
+                    break;
+                case 'TUNNEL_ENTRANCE':
+                    consider(e, d, 'TUNNELGA KIRISH', 'KIRISH', () => enterTunnel(e));
+                    break;
+                case 'DOCUMENT':
+                    if (!e.active) break;
+                    if (state.tunnelOpen) consider(e, d, 'HUJJATNI OLISH', 'OLISH', () => pickDocument(e));
+                    else consider(e, d, 'AVVAL TUNNELNI OCHING', 'TUNNEL?', () => showNotification('AVVAL TUNNELNI OCHING!', 'orange'));
+                    break;
+                case 'EXIT':
+                    if (e.active) consider(e, d, 'QOCHISH', 'QOCHISH', win);
+                    break;
             }
-        });
+        }
+
+        for (const e of enemies) {
+            const d = dist(player, e);
+            if (e.stunned > 0) {
+                if (d < TILE && e.subtype.id !== TYPES.CIVILIAN.id) consider(e, d, 'NIQOBNI OLISH', 'NIQOB', () => stealDisguise(e));
+            } else if (d < TILE + 20 && !player.isHidden && e.alert < 50) {
+                const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+                if (Math.abs(normalizeAngle(angleToPlayer - e.angle)) > 1.5) {
+                    consider(e, d, 'ZARARSIZLANTIRISH', 'URISH', () => stunEnemy(e));
+                }
+            }
+        }
+        return best;
     }
 
     function interact() {
-        if(!state.active) return;
-
-        let acted = false;
-        
-        entities.forEach(e => {
-            if(acted) return;
-            let d = dist(player, e);
-
-            // --- KEY INTERACTION ---
-            if(e.type === 'KEY' && e.active && d < TILE) {
-                e.active = false;
-                state.hasKey = true;
-                ui.invKey.classList.add('inv-active');
-                ui.invKey.style.opacity = '1';
-                showNotification("KALIT TOPILDI!", "cyan");
-                ui.missionStatus.innerHTML = "HUJJAT XONASINI TOPING VA <span style='color:lime'>TUNNELNI OCHING</span>";
-                acted = true;
-            }
-            
-            // --- SECRET DOOR INTERACTION ---
-            else if(e.type === 'SECRET_DOOR' && e.active && d < TILE*1.5) {
-                if(state.hasKey) {
-                    e.active = false; // Opens
-                    state.tunnelOpen = true;
-                    showNotification("TUNNEL OCHILDI!", "lime");
-                    spawnParticles(e.x, e.y, 30, '#555');
-                    // Create visual 'hole'
-                    e.type = 'TUNNEL_ENTRANCE'; 
-                    acted = true;
-                } else {
-                    showNotification("KALIT KERAK!", "red");
-                }
-            }
-
-            // --- TUNNEL TELEPORT ---
-            else if(e.type === 'TUNNEL_ENTRANCE' && d < TILE) {
-                // Teleport to exit area
-                showNotification("TUNNELGA KIRILDI...", "#aaa");
-                player.x = e.targetX;
-                player.y = e.targetY;
-                acted = true;
-            }
-
-            // --- DOCUMENT INTERACTION ---
-            else if(e.type === 'DOCUMENT' && e.active && d < TILE) {
-                if(!state.tunnelOpen) {
-                    showNotification("AVVAL TUNNELNI OCHING!", "orange");
-                } else {
-                    e.active = false;
-                    state.hasDocument = true;
-                    ui.invDoc.classList.add('inv-active');
-                    ui.invDoc.style.opacity = '1';
-                    
-                    let exit = entities.find(x => x.type === 'EXIT');
-                    exit.active = true;
-                    
-                    showNotification("HUJJAT OLINDI! SIGNALIZATSIYA!", "red");
-                    triggerAlarm();
-                    acted = true;
-                }
-            }
-
-            else if(e.type === 'EXIT' && e.active && d < TILE) {
-                win();
-                acted = true;
-            }
-
-            else if(e.type === 'ENEMY' && e.stunned > 0 && d < TILE) {
-                 player.disguise = e.subtype;
-                 e.subtype = TYPES.CIVILIAN; 
-                 updateDisguiseUI();
-                 showNotification("NIQOB O'G'IRLANDI", "#00ff9d");
-                 spawnParticles(player.x, player.y, 20, '#fff');
-                 acted = true;
-            }
-        });
-
-        if(!acted) {
-            let target = getNearestEnemy(TILE + 20);
-            if(target && target.alert < 50 && target.stunned <= 0) {
-                let angleToPlayer = Math.atan2(player.y - target.y, player.x - target.x);
-                let angleDiff = Math.abs(normalizeAngle(angleToPlayer - target.angle));
-                
-                if(angleDiff > 1.5) { 
-                    target.stunned = 600; 
-                    target.alert = 0;
-                    target.state = 'PATROL';
-                    showNotification("ZARARSIZLANTIRILDI", "#aaa");
-                    spawnParticles(target.x, target.y, 10, '#ff0000');
-                }
-            }
-        }
+        if (state.mode !== 'playing') return;
+        const it = findInteraction();
+        if (it) it.run();
+        state.interaction = findInteraction();
     }
 
-    function update() {
-        if(!state.active) return;
+    function pickKey(e) {
+        e.active = false;
+        state.hasKey = true;
+        ui.invKey.classList.add('inv-active');
+        showNotification('KALIT TOPILDI!', 'cyan');
+        ui.missionStatus.innerHTML = "HUJJAT XONASINI TOPING VA <span style='color:lime'>TUNNELNI OCHING</span>";
+        buzz(40);
+    }
 
-        let elapsed = Math.floor((Date.now() - state.startTime)/1000);
-        let m = Math.floor(elapsed/60).toString().padStart(2,'0');
-        let s = (elapsed%60).toString().padStart(2,'0');
-        ui.timeDisp.innerText = `${m}:${s}`;
+    function openTunnel(e) {
+        e.active = false;
+        e.type = 'TUNNEL_ENTRANCE';
+        state.tunnelOpen = true;
+        showNotification('TUNNEL OCHILDI!', 'lime');
+        spawnParticles(e.x, e.y, 30, '#555');
+        ui.missionStatus.innerHTML = "<span style='color:gold'>HUJJATNI</span> OLING";
+        buzz(40);
+    }
+
+    function enterTunnel(e) {
+        showNotification('TUNNELGA KIRILDI...', '#aaa');
+        player.x = player.px = e.targetX;
+        player.y = player.py = e.targetY;
+        snapCamera();
+    }
+
+    function pickDocument(e) {
+        e.active = false;
+        state.hasDocument = true;
+        ui.invDoc.classList.add('inv-active');
+        const exit = entities.find((x) => x.type === 'EXIT');
+        if (exit) exit.active = true;
+        showNotification('HUJJAT OLINDI! SIGNALIZATSIYA!', 'red');
+        triggerAlarm();
+    }
+
+    function stealDisguise(e) {
+        player.disguise = e.subtype;
+        e.subtype = TYPES.CIVILIAN;
+        updateDisguiseUI();
+        showNotification("NIQOB O'G'IRLANDI", '#00ff9d');
+        spawnParticles(player.x, player.y, 20, '#fff');
+        buzz(40);
+    }
+
+    function stunEnemy(e) {
+        e.stunned = 600;
+        e.alert = 0;
+        e.state = state.alarm ? 'ALARM_RESPONSE' : 'PATROL';
+        showNotification('ZARARSIZLANTIRILDI', '#aaa');
+        spawnParticles(e.x, e.y, 10, '#ff0000');
+        buzz(30);
+    }
+
+    function tick() {
+        state.elapsed += STEP;
+
+        player.px = player.x; player.py = player.y;
+        state.camera.px = state.camera.x; state.camera.py = state.camera.y;
+        for (const e of enemies) { e.px = e.x; e.py = e.y; }
 
         // Movement
-        let dx = 0, dy = 0;
-        let speed = keys['ShiftLeft'] ? player.maxSpeed * 1.6 : player.maxSpeed;
-        player.noise = (keys['ShiftLeft'] && (dx||dy)) ? 100 : 0; // Fix noise logic
+        const mv = getMoveVector();
+        const mag = Math.hypot(mv.x, mv.y);
+        const moving = mag > 0.01;
+        const running = moving && isRunHeld();
+        const speed = player.maxSpeed * (running ? 1.6 : 1);
+        player.noise = running ? 80 : 0;
 
-        if(keys['KeyW']) dy = -speed;
-        if(keys['KeyS']) dy = speed;
-        if(keys['KeyA']) dx = -speed;
-        if(keys['KeyD']) dx = speed;
-        if(dx!==0 || dy!==0) player.noise = keys['ShiftLeft'] ? 80 : 0;
+        const dx = mv.x * speed, dy = mv.y * speed;
+        if (dx && !collides(player.x + dx, player.y, PLAYER_R)) player.x += dx;
+        if (dy && !collides(player.x, player.y + dy, PLAYER_R)) player.y += dy;
 
-        if(!isWall(player.x + dx, player.y)) player.x += dx;
-        if(!isWall(player.x, player.y + dy)) player.y += dy;
+        // Facing
+        if (input.mode === 'desktop' && input.mouse.active) {
+            const wx = input.mouse.x / view.zoom + state.camera.x;
+            const wy = input.mouse.y / view.zoom + state.camera.y;
+            player.angle = Math.atan2(wy - player.y, wx - player.x);
+        } else if (moving) {
+            player.angle = lerpAngle(player.angle, Math.atan2(mv.y, mv.x), 0.25);
+        }
 
-        let cx = player.x - state.width/2;
-        let cy = player.y - state.height/2;
-        player.angle = Math.atan2(mouse.y - (player.y - cy - state.camera.y), mouse.x - (player.x - cx - state.camera.x)); 
         // Camera follow
-        state.camera.x += (player.x - state.width/2 - state.camera.x) * 0.1;
-        state.camera.y += (player.y - state.height/2 - state.camera.y) * 0.1;
-
-        ui.prompt.style.display = 'none';
+        const cam = state.camera;
+        cam.x += (player.x - view.w / view.zoom / 2 - cam.x) * 0.1;
+        cam.y += (player.y - view.h / view.zoom / 2 - cam.y) * 0.1;
 
         // Hiding
         player.isHidden = false;
-        let onVent = false;
-        entities.forEach(e => {
-            if(e.type === 'VENT' && dist(player, e) < 30) {
-                player.isHidden = true; onVent = true;
-            }
-        });
-        ui.hiddenIndicator.style.display = onVent ? 'block' : 'none';
+        for (const e of entities) {
+            if (e.type === 'VENT' && dist(player, e) < 30) { player.isHidden = true; break; }
+        }
 
-        // Update Entities
-        entities.forEach(e => {
-            if(e.type === 'ENEMY') updateEnemy(e);
-            
-            let d = dist(player, e);
-            if(d < TILE) {
-                if(e.type === 'KEY' && e.active) showPrompt(e, "KALITNI OLISH");
-                if(e.type === 'SECRET_DOOR' && e.active) showPrompt(e, state.hasKey ? "TUNNELNI OCHISH" : "KILITLANGAN (KALIT KERAK)");
-                if(e.type === 'TUNNEL_ENTRANCE') showPrompt(e, "KIRISH");
-                if(e.type === 'DOCUMENT' && e.active) showPrompt(e, state.tunnelOpen ? "HUJJATNI OLISH" : "AVVAL TUNNELNI OCHING");
-                if(e.type === 'EXIT' && e.active) showPrompt(e, "QOCHISH");
-                
-                if(e.type === 'ENEMY') {
-                     if(e.stunned > 0 && e.subtype.id !== 0) showPrompt(e, "NIQOBNI OLISH");
-                     else if(e.stunned <= 0 && !player.isHidden) {
-                          let angleToP = Math.atan2(player.y - e.y, player.x - e.x);
-                          if(Math.abs(normalizeAngle(angleToP - e.angle)) > 1.5) showPrompt(e, "ZARARSIZLANTIRISH");
-                     }
-                }
-            }
-        });
+        for (const e of enemies) {
+            updateEnemy(e);
+            if (state.mode !== 'playing') return;
+        }
 
-        let noiseP = player.noise > 0 ? 100 : 0;
-        ui.noiseBar.style.width = noiseP + '%';
-        ui.noiseBar.style.background = noiseP > 50 ? 'red' : 'var(--primary)';
+        for (const p of particles) { p.x += p.vx; p.y += p.vy; p.life--; }
+        if (particles.length) particles = particles.filter((p) => p.life > 0);
+
+        state.interaction = findInteraction();
+    }
+
+    function pickPatrolTarget(e) {
+        for (let i = 0; i < 6; i++) {
+            const ang = Math.random() * Math.PI * 2;
+            const tx = e.x + Math.cos(ang) * 200;
+            const ty = e.y + Math.sin(ang) * 200;
+            if (!collides(tx, ty, ENEMY_R)) { e.targetX = tx; e.targetY = ty; break; }
+        }
+        e.pathTimer = 200;
     }
 
     function updateEnemy(e) {
-        if(e.stunned > 0) { e.stunned--; return; }
+        if (e.stunned > 0) { e.stunned--; return; }
 
-        let dToPlayer = dist(player, e);
-        let angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
-        
+        const dP = dist(player, e);
+        const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+
         // HEARING
-        if(player.noise > 0 && dToPlayer < 250) {
-            e.state = 'INVESTIGATE';
+        if (player.noise > 0 && dP < 250 && e.state !== 'CHASE') {
+            e.state = state.alarm ? 'ALARM_RESPONSE' : 'INVESTIGATE';
             e.targetX = player.x; e.targetY = player.y;
-            e.pathTimer = 100;
+            e.pathTimer = state.alarm ? 180 : 100;
+            e.wait = 0;
         }
 
         // VISION
-        let angleDiff = Math.abs(normalizeAngle(angleToPlayer - e.angle));
-        let seePlayer = false;
-
-        if(!player.isHidden && dToPlayer < e.subtype.viewDist && angleDiff < e.subtype.viewAngle/2) {
-            if(!rayCast(e.x, e.y, player.x, player.y)) {
-                let detected = false;
-                
-                // Normal Logic
-                if(e.subtype.id === TYPES.BOSS.id && player.disguise.id !== TYPES.BOSS.id) detected = true;
-                if(e.subtype.id === TYPES.GUARD.id && player.disguise.id === TYPES.CIVILIAN.id) detected = true;
-                
-                // Alarm Logic: If alarm is on, ANYONE seeing you is instant Game Over (unless invisible)
-                if(state.alarmTriggered) {
-                     detected = true;
-                }
-
-                if(detected) {
-                    e.alert += state.alarmTriggered ? 5 : 2; // Fast detect on alarm
-                    e.state = 'CHASE';
-                    e.targetX = player.x; e.targetY = player.y;
-                    seePlayer = true;
-                }
+        let sees = false;
+        if (!player.isHidden && dP < e.subtype.viewDist &&
+            Math.abs(normalizeAngle(angleToPlayer - e.angle)) < e.subtype.viewAngle / 2 &&
+            !rayCast(e.x, e.y, player.x, player.y)) {
+            const detected = state.alarm ||
+                (e.subtype.id === TYPES.BOSS.id && player.disguise.id !== TYPES.BOSS.id) ||
+                (e.subtype.id === TYPES.GUARD.id && player.disguise.id === TYPES.CIVILIAN.id);
+            if (detected) {
+                e.alert += state.alarm ? 5 : 2;
+                e.state = 'CHASE';
+                e.targetX = player.x; e.targetY = player.y;
+                e.wait = 0;
+                sees = true;
             }
-        } 
-        
-        if(!seePlayer && e.state !== 'ALARM_RESPONSE') e.alert = Math.max(0, e.alert - 0.5);
-
-        if(e.alert >= 100) gameOver("SIZNI " + e.subtype.name + " KO'RIB QOLDI!");
-
-        // MOVEMENT
-        let moveSpeed = 1.5;
-        if (e.state === 'CHASE') moveSpeed = 3.5;
-        else if (e.state === 'ALARM_RESPONSE') moveSpeed = 3.0;
-
-        if(e.state === 'PATROL') {
-            if(e.pathTimer <= 0 || dist({x:e.targetX, y:e.targetY}, e) < 10) {
-                let ang = Math.random() * 6.28;
-                e.targetX = e.x + Math.cos(ang) * 200;
-                e.targetY = e.y + Math.sin(ang) * 200;
-                e.pathTimer = 200;
-            } else { e.pathTimer--; }
         }
 
-        let mAngle = Math.atan2(e.targetY - e.y, e.targetX - e.x);
-        e.angle = lerpAngle(e.angle, mAngle, 0.1);
+        if (!sees && e.state !== 'ALARM_RESPONSE') e.alert = Math.max(0, e.alert - 0.5);
+        if (e.alert >= 100) { gameOver('SIZNI ' + e.subtype.name + " KO'RIB QOLDI!"); return; }
 
-        let mx = Math.cos(e.angle) * moveSpeed;
-        let my = Math.sin(e.angle) * moveSpeed;
+        // Look around after reaching a point of interest
+        if (e.wait > 0) { e.wait--; e.angle += 0.03; return; }
 
-        if(!isWall(e.x + mx, e.y)) e.x += mx;
-        else { e.pathTimer = 0; if(!isWall(e.x, e.y + my)) e.y += my; }
-        if(!isWall(e.x, e.y + my)) e.y += my;
+        const reached = Math.hypot(e.targetX - e.x, e.targetY - e.y) < 12;
+        switch (e.state) {
+            case 'PATROL':
+                if (reached) { e.wait = 30 + Math.floor(Math.random() * 40); pickPatrolTarget(e); return; }
+                if (--e.pathTimer <= 0) pickPatrolTarget(e);
+                break;
+            case 'INVESTIGATE':
+            case 'CHASE':
+                if (reached && !sees) {
+                    e.state = state.alarm ? 'ALARM_RESPONSE' : 'PATROL';
+                    e.wait = 90;
+                    e.pathTimer = 0;
+                    return;
+                }
+                break;
+            case 'ALARM_RESPONSE':
+                if (reached || --e.pathTimer <= 0) {
+                    e.targetX = player.x + (Math.random() - 0.5) * 320;
+                    e.targetY = player.y + (Math.random() - 0.5) * 320;
+                    e.pathTimer = 180;
+                }
+                break;
+        }
+        if (reached) return;
+
+        const moveSpeed = e.state === 'CHASE' ? 3.5 : e.state === 'ALARM_RESPONSE' ? 3.0 : 1.5;
+        e.angle = lerpAngle(e.angle, Math.atan2(e.targetY - e.y, e.targetX - e.x), 0.1);
+        const mx = Math.cos(e.angle) * moveSpeed;
+        const my = Math.sin(e.angle) * moveSpeed;
+
+        let blocked = 0;
+        if (!collides(e.x + mx, e.y, ENEMY_R)) e.x += mx; else blocked++;
+        if (!collides(e.x, e.y + my, ENEMY_R)) e.y += my; else blocked++;
+
+        if (blocked === 2) e.stuck++; else e.stuck = 0;
+        if (blocked && e.state === 'PATROL') e.pathTimer = 0;
+        if (e.stuck > 30) {
+            e.stuck = 0;
+            if (e.state === 'CHASE' || e.state === 'INVESTIGATE') e.state = state.alarm ? 'ALARM_RESPONSE' : 'PATROL';
+            e.pathTimer = 0;
+            pickPatrolTarget(e);
+        }
     }
 
-    function draw() {
-        ctx.fillStyle = '#050505';
-        ctx.fillRect(0, 0, state.width, state.height);
+    function spawnParticles(x, y, n, color) {
+        for (let i = 0; i < n; i++) {
+            particles.push({
+                x, y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 30,
+                size: 1 + Math.random() * 4,
+                color
+            });
+        }
+    }
 
-        if(!state.active) return; 
+    // ---------- RENDER ----------
+    function currentObjective() {
+        if (!state.hasKey) return entities.find((e) => e.type === 'KEY' && e.active);
+        if (!state.tunnelOpen) return entities.find((e) => e.type === 'SECRET_DOOR');
+        if (!state.hasDocument) return entities.find((e) => e.type === 'DOCUMENT' && e.active);
+        return null;
+    }
+
+    function render(alpha) {
+        ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+        ctx.fillStyle = '#050505';
+        ctx.fillRect(0, 0, view.w, view.h);
+        if (!map.length || state.mode === 'menu') return;
+
+        const z = view.zoom;
+        const camX = lerp(state.camera.px, state.camera.x, alpha);
+        const camY = lerp(state.camera.py, state.camera.y, alpha);
+        const now = performance.now();
 
         ctx.save();
-        ctx.translate(-state.camera.x, -state.camera.y);
+        ctx.scale(z, z);
+        ctx.translate(-camX, -camY);
 
         // Map
-        let startCol = Math.floor(state.camera.x / TILE);
-        let endCol = startCol + (state.width / TILE) + 1;
-        let startRow = Math.floor(state.camera.y / TILE);
-        let endRow = startRow + (state.height / TILE) + 1;
-
-        for(let r = Math.max(0,startRow); r < Math.min(map.length, endRow); r++) {
-            for(let c = Math.max(0,startCol); c < Math.min(map[0].length, endCol); c++) {
-                let type = map[r][c];
-                let x = c * TILE; let y = r * TILE;
-
-                if(type === 1) { // Wall
+        const c0 = Math.max(0, Math.floor(camX / TILE));
+        const c1 = Math.min(map[0].length, Math.ceil((camX + view.w / z) / TILE) + 1);
+        const r0 = Math.max(0, Math.floor(camY / TILE));
+        const r1 = Math.min(map.length, Math.ceil((camY + view.h / z) / TILE) + 1);
+        ctx.lineWidth = 2;
+        for (let r = r0; r < r1; r++) {
+            for (let c = c0; c < c1; c++) {
+                const t = map[r][c];
+                const x = c * TILE, y = r * TILE;
+                if (t === 1) {
                     ctx.fillStyle = COLORS.wall;
                     ctx.fillRect(x, y, TILE, TILE);
-                    ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.strokeRect(x, y, TILE, TILE);
-                } else { // Floor
-                    ctx.fillStyle = COLORS.floor;
-                    if(type === 2) ctx.fillStyle = COLORS.bossFloor;
-                    if(type === 3) ctx.fillStyle = COLORS.secureFloor;
+                    ctx.strokeStyle = '#111';
+                } else {
+                    ctx.fillStyle = t === 2 ? COLORS.bossFloor : t === 3 ? COLORS.secureFloor : COLORS.floor;
                     ctx.fillRect(x, y, TILE, TILE);
-                    ctx.strokeStyle = '#222'; ctx.strokeRect(x, y, TILE, TILE);
+                    ctx.strokeStyle = '#222';
                 }
+                ctx.strokeRect(x, y, TILE, TILE);
             }
+        }
+
+        // Objective highlight (helps on small screens)
+        const obj = currentObjective();
+        if (obj) {
+            const pulse = 30 + Math.sin(now / 250) * 6;
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.55)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath(); ctx.arc(obj.x, obj.y, pulse + 10, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
         }
 
         // Entities
-        entities.forEach(e => {
-            if(e.type === 'VENT') {
-                ctx.fillStyle = '#111'; ctx.fillRect(e.x-20, e.y-20, 40, 40);
-                ctx.strokeStyle = '#333'; ctx.strokeRect(e.x-20, e.y-20, 40, 40);
-                // Grate lines
-                ctx.beginPath();
-                for(let i=-20; i<20; i+=10) { ctx.moveTo(e.x+i, e.y-20); ctx.lineTo(e.x+i, e.y+20); }
-                ctx.stroke();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const e of entities) {
+            switch (e.type) {
+                case 'VENT':
+                    ctx.fillStyle = '#111'; ctx.fillRect(e.x - 20, e.y - 20, 40, 40);
+                    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.strokeRect(e.x - 20, e.y - 20, 40, 40);
+                    ctx.beginPath();
+                    for (let i = -10; i < 20; i += 10) { ctx.moveTo(e.x + i, e.y - 20); ctx.lineTo(e.x + i, e.y + 20); }
+                    ctx.stroke();
+                    break;
+                case 'KEY':
+                    if (!e.active) break;
+                    ctx.font = '30px sans-serif';
+                    ctx.fillText('🔑', e.x, e.y);
+                    break;
+                case 'SECRET_DOOR':
+                    if (!e.active) break;
+                    ctx.fillStyle = '#444';
+                    ctx.fillRect(e.x - 28, e.y - 28, 56, 56);
+                    ctx.strokeStyle = 'red'; ctx.lineWidth = 2;
+                    ctx.strokeRect(e.x - 28, e.y - 28, 56, 56);
+                    ctx.fillStyle = 'red';
+                    ctx.font = 'bold 12px monospace';
+                    ctx.fillText('QULF', e.x, e.y);
+                    break;
+                case 'TUNNEL_ENTRANCE':
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(e.x, e.y, 25, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = 'lime'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.fillStyle = 'lime'; ctx.font = '12px monospace';
+                    ctx.fillText('TUNNEL', e.x, e.y);
+                    break;
+                case 'DOCUMENT':
+                    if (!e.active) break;
+                    ctx.fillStyle = '#420'; ctx.fillRect(e.x - 30, e.y - 15, 60, 30);
+                    ctx.fillStyle = '#fff';
+                    ctx.shadowBlur = 15; ctx.shadowColor = 'white';
+                    ctx.fillRect(e.x - 10, e.y - 14, 20, 28);
+                    ctx.shadowBlur = 0;
+                    break;
+                case 'EXIT':
+                    if (!e.active) break;
+                    ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(now / 1000);
+                    ctx.strokeStyle = '#0f0'; ctx.lineWidth = 4; ctx.setLineDash([10, 10]);
+                    ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2); ctx.stroke();
+                    ctx.restore();
+                    break;
             }
-            if(e.type === 'KEY' && e.active) {
-                ctx.fillStyle = 'cyan';
-                ctx.font = '30px sans-serif';
-                ctx.fillText('🔑', e.x-15, e.y+10);
-            }
-            if(e.type === 'SECRET_DOOR' && e.active) {
-                ctx.fillStyle = '#444'; // Looks like a wall but slightly different
-                ctx.fillRect(e.x, e.y, TILE, TILE);
-                ctx.strokeStyle = 'red';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(e.x, e.y, TILE, TILE);
-                ctx.fillStyle = 'red';
-                ctx.font = '12px monospace';
-                ctx.fillText("LOCKED", e.x+10, e.y+35);
-            }
-            if(e.type === 'TUNNEL_ENTRANCE') {
-                ctx.fillStyle = '#000';
-                ctx.beginPath(); ctx.arc(e.x+32, e.y+32, 25, 0, 6.28); ctx.fill();
-                ctx.strokeStyle = 'lime';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.fillStyle = 'lime'; ctx.font = '12px monospace'; ctx.fillText("TUNNEL", e.x+15, e.y+35);
-            }
-            if(e.type === 'DOCUMENT' && e.active) {
-                ctx.fillStyle = '#420'; ctx.fillRect(e.x-30, e.y-15, 60, 30);
-                ctx.fillStyle = '#fff';
-                ctx.shadowBlur = 15; ctx.shadowColor = 'white';
-                ctx.fillRect(e.x-10, e.y-14, 20, 28);
-                ctx.shadowBlur = 0;
-            }
-            if(e.type === 'EXIT' && e.active) {
-                ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(Date.now()/1000);
-                ctx.strokeStyle = '#0f0'; ctx.lineWidth = 4; ctx.setLineDash([10, 10]);
-                ctx.beginPath(); ctx.arc(0, 0, 40, 0, 6.28); ctx.stroke();
-                ctx.restore();
-            }
-        });
+        }
 
-        // Enemies
-        entities.forEach(e => { if(e.type === 'ENEMY') drawCharacter(e); });
+        for (const e of enemies) drawCharacter(e, lerp(e.px, e.x, alpha), lerp(e.py, e.y, alpha), true);
 
-        // Player
-        if(player.isHidden) ctx.globalAlpha = 0.4;
-        drawCharacter({ x: player.x, y: player.y, angle: player.angle, subtype: player.disguise, type: 'PLAYER' });
-        ctx.globalAlpha = 1.0;
+        if (player.isHidden) ctx.globalAlpha = 0.4;
+        drawCharacter(player, lerp(player.px, player.x, alpha), lerp(player.py, player.y, alpha), false);
+        ctx.globalAlpha = 1;
 
-        // Particles
-        particles.forEach((p, i) => {
-            p.x += p.vx; p.y += p.vy; p.life--;
-            ctx.fillStyle = p.color; ctx.globalAlpha = p.life / 20;
+        for (const p of particles) {
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = clamp(p.life / 30, 0, 1);
             ctx.fillRect(p.x, p.y, p.size, p.size);
-            ctx.globalAlpha = 1;
-            if(p.life<=0) particles.splice(i,1);
-        });
+        }
+        ctx.globalAlpha = 1;
 
         ctx.restore();
         drawMinimap();
     }
 
-    function drawCharacter(c) {
-        ctx.save(); ctx.translate(c.x, c.y);
-        
-        if(c.type === 'ENEMY' && c.stunned <= 0) {
-            ctx.rotate(c.angle);
-            let grad = ctx.createRadialGradient(0, 0, 10, 0, 0, c.subtype.viewDist);
-            let color = '255, 255, 255';
-            if(c.state === 'INVESTIGATE') color = '255, 200, 0';
-            if(c.state === 'CHASE' || c.state === 'ALARM_RESPONSE') color = '255, 0, 0';
-            
-            grad.addColorStop(0, `rgba(${color}, 0.3)`);
-            grad.addColorStop(1, `rgba(${color}, 0)`);
-            
+    function drawCharacter(c, x, y, isEnemy) {
+        const subtype = isEnemy ? c.subtype : c.disguise;
+        const color = subtype.color;
+        ctx.save();
+        ctx.translate(x, y);
+
+        if (isEnemy && c.stunned <= 0) {
+            let rgb = '255, 255, 255';
+            if (c.state === 'INVESTIGATE') rgb = '255, 200, 0';
+            if (c.state === 'CHASE' || c.state === 'ALARM_RESPONSE') rgb = '255, 0, 0';
+            const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, subtype.viewDist);
+            grad.addColorStop(0, `rgba(${rgb}, 0.3)`);
+            grad.addColorStop(1, `rgba(${rgb}, 0)`);
             ctx.fillStyle = grad;
-            ctx.beginPath(); ctx.moveTo(0, 0);
-            ctx.arc(0, 0, c.subtype.viewDist, -c.subtype.viewAngle/2, c.subtype.viewAngle/2);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, subtype.viewDist, c.angle - subtype.viewAngle / 2, c.angle + subtype.viewAngle / 2);
+            ctx.closePath();
             ctx.fill();
-        } else { ctx.rotate(c.angle); }
+        }
 
-        let color = c.subtype ? c.subtype.color : '#fff';
+        ctx.save();
+        ctx.rotate(c.angle);
         ctx.shadowColor = color; ctx.shadowBlur = 10;
-        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, 0, 14, 0, 6.28); ctx.fill();
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = color;
+        ctx.fillRect(8, -2, 12, 4);
+        ctx.restore();
 
-        ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 6.28); ctx.fill();
-        ctx.fillStyle = color; ctx.fillRect(8, 4, 12, 4); 
-
-        if(c.subtype && c.subtype.id === TYPES.BOSS.id) {
-            ctx.fillStyle = 'gold'; ctx.font = "20px Arial"; ctx.fillText("👑", -10, -10);
+        ctx.font = '18px sans-serif';
+        if (subtype.id === TYPES.BOSS.id) ctx.fillText('👑', 0, -22);
+        if (isEnemy && c.stunned > 0) ctx.fillText('💫', 0, -26);
+        if (isEnemy && c.alert > 0) {
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(-16, -36, 32, 6);
+            ctx.fillStyle = 'red';
+            ctx.fillRect(-15, -35, 30 * clamp(c.alert / 100, 0, 1), 4);
         }
-        if(c.stunned > 0) {
-             ctx.fillStyle = '#fff'; ctx.font = "20px Arial"; ctx.fillText("💫", -10, -20);
-        }
-        if(c.alert > 0) {
-            ctx.fillStyle = 'red'; ctx.fillRect(-15, -30, 30 * (c.alert/100), 4);
-        }
-        ctx.shadowBlur = 0; ctx.restore();
+        ctx.restore();
     }
 
     function drawMinimap() {
-        if(!map || map.length === 0) return;
-        mmCtx.fillStyle = '#000'; mmCtx.fillRect(0, 0, mmCanvas.width, mmCanvas.height);
-        
-        // Follow Player Logic
-        const zoom = 0.8; // Zoom factor
-        const viewSize = 10; // Number of tiles to show around player
-        const scale = mmCanvas.width / (viewSize * 2);
-        
-        const pCol = player.x / TILE;
-        const pRow = player.y / TILE;
+        const W = mmCanvas.width, H = mmCanvas.height;
+        if (!W || !H || !map.length) return;
+        mmCtx.setTransform(1, 0, 0, 1, 0, 0);
+        mmCtx.fillStyle = '#000';
+        mmCtx.fillRect(0, 0, W, H);
+
+        const viewTiles = 12;
+        const scale = W / (viewTiles * 2);
+        const pCol = player.x / TILE, pRow = player.y / TILE;
 
         mmCtx.save();
-        mmCtx.translate(mmCanvas.width/2, mmCanvas.height/2);
-        mmCtx.scale(zoom, zoom);
-        mmCtx.translate(-pCol * scale, -pRow * scale);
-
-        for(let r = Math.floor(pRow - viewSize); r < Math.ceil(pRow + viewSize); r++) {
-            for(let c = Math.floor(pCol - viewSize); c < Math.ceil(pCol + viewSize); c++) {
-                if(r < 0 || r >= map.length || c < 0 || c >= map[0].length) continue;
-                
-                let x = c * scale;
-                let y = r * scale;
-                
-                if(map[r][c]===1) { mmCtx.fillStyle = '#444'; mmCtx.fillRect(x, y, scale, scale); }
-                else if (map[r][c]===2) { mmCtx.fillStyle = '#500'; mmCtx.fillRect(x, y, scale, scale); }
-                else if (map[r][c]===3) { mmCtx.fillStyle = '#005'; mmCtx.fillRect(x, y, scale, scale); }
-                else { mmCtx.fillStyle = '#111'; mmCtx.fillRect(x, y, scale, scale); }
+        mmCtx.translate(W / 2 - pCol * scale, H / 2 - pRow * scale);
+        const rs = Math.max(0, Math.floor(pRow - viewTiles - 1)), re = Math.min(map.length, Math.ceil(pRow + viewTiles + 1));
+        const cs = Math.max(0, Math.floor(pCol - viewTiles - 1)), ce = Math.min(map[0].length, Math.ceil(pCol + viewTiles + 1));
+        for (let r = rs; r < re; r++) {
+            for (let c = cs; c < ce; c++) {
+                const t = map[r][c];
+                mmCtx.fillStyle = t === 1 ? '#444' : t === 2 ? '#500' : t === 3 ? '#005' : '#111';
+                mmCtx.fillRect(c * scale, r * scale, scale + 0.5, scale + 0.5);
             }
         }
-
-        function drawDot(e, color) {
-            mmCtx.fillStyle = color; mmCtx.beginPath();
-            mmCtx.arc(e.x/TILE*scale, e.y/TILE*scale, 4, 0, 6.28); mmCtx.fill();
+        const dotR = Math.max(2, W / 45);
+        const dot = (e, color) => {
+            mmCtx.fillStyle = color;
+            mmCtx.beginPath();
+            mmCtx.arc(e.x / TILE * scale, e.y / TILE * scale, dotR, 0, Math.PI * 2);
+            mmCtx.fill();
+        };
+        for (const e of entities) {
+            if (e.type === 'KEY' && e.active) dot(e, 'cyan');
+            else if (e.type === 'DOCUMENT' && e.active) dot(e, 'gold');
+            else if (e.type === 'SECRET_DOOR' && e.active) dot(e, 'magenta');
+            else if (e.type === 'TUNNEL_ENTRANCE') dot(e, 'lime');
+            else if (e.type === 'EXIT' && e.active) dot(e, '#0f0');
         }
-        
-        drawDot(player, '#0f0');
-        entities.forEach(e => {
-            if(e.type === 'KEY' && e.active) drawDot(e, 'cyan');
-            if(e.type === 'DOCUMENT' && e.active) drawDot(e, 'gold');
-            if(e.type === 'SECRET_DOOR' && e.active) drawDot(e, 'magenta');
-            if(e.type === 'EXIT' && e.active) drawDot(e, '#0f0');
-            if(e.type === 'ENEMY' && e.stunned<=0) drawDot(e, 'red');
-        });
-        
+        for (const e of enemies) if (e.stunned <= 0) dot(e, 'red');
+        dot(player, '#0f0');
         mmCtx.restore();
     }
 
-    // --- UTILS ---
-    function isWall(x, y) {
-        if(!map || map.length === 0) return true;
-        let c = Math.floor(x/TILE); let r = Math.floor(y/TILE);
-        if(r<0 || r>=map.length || c<0 || c>=map[0].length) return true;
-        
-        // Secret door acts as wall until opened
-        for(let e of entities) {
-            if(e.type === 'SECRET_DOOR' && e.active) {
-                if(x > e.x && x < e.x+TILE && y > e.y && y < e.y+TILE) return true;
-            }
+    // ---------- HUD ----------
+    const hudCache = { time: '', noise: -1, hidden: null, promptText: '', actionShort: null };
+
+    function updateHud(alpha) {
+        const t = formatTime(state.elapsed);
+        if (t !== hudCache.time) { ui.timeDisp.textContent = t; hudCache.time = t; }
+
+        const noise = player.noise > 0 ? 100 : 0;
+        if (noise !== hudCache.noise) {
+            ui.noiseBar.style.width = noise + '%';
+            ui.noiseBar.style.background = noise > 50 ? 'red' : 'var(--primary)';
+            hudCache.noise = noise;
         }
-        return map[r][c] === 1;
-    }
-    
-    function rayCast(x1, y1, x2, y2) {
-        let dist = Math.hypot(x2-x1, y2-y1);
-        let steps = dist / 20;
-        let dx = (x2-x1)/steps; let dy = (y2-y1)/steps;
-        for(let i=0; i<steps; i++) { if(isWall(x1 + dx*i, y1 + dy*i)) return true; }
-        return false;
+
+        const hidden = state.mode === 'playing' && player.isHidden;
+        if (hidden !== hudCache.hidden) { ui.hiddenIndicator.classList.toggle('hidden', !hidden); hudCache.hidden = hidden; }
+
+        const it = state.mode === 'playing' ? state.interaction : null;
+        if (it) {
+            const e = it.e;
+            const ex = e.px !== undefined ? lerp(e.px, e.x, alpha) : e.x;
+            const ey = e.py !== undefined ? lerp(e.py, e.y, alpha) : e.y;
+            const camX = lerp(state.camera.px, state.camera.x, alpha);
+            const camY = lerp(state.camera.py, state.camera.y, alpha);
+            const text = (input.mode === 'touch' ? '' : '[E] ') + it.label;
+            if (text !== hudCache.promptText) {
+                ui.prompt.textContent = '';
+                if (input.mode !== 'touch') {
+                    const k = document.createElement('span');
+                    k.className = 'key';
+                    k.textContent = 'E';
+                    ui.prompt.append(k, ' - ' + it.label);
+                } else {
+                    ui.prompt.textContent = it.label;
+                }
+                hudCache.promptText = text;
+            }
+            ui.prompt.classList.remove('hidden');
+            const pw = ui.prompt.offsetWidth, ph = ui.prompt.offsetHeight;
+            const sx = clamp((ex - camX) * view.zoom - pw / 2, 8, view.w - pw - 8);
+            const sy = clamp((ey - camY) * view.zoom - 34 * Math.max(view.zoom, 0.7) - ph, 8, view.h - ph - 8);
+            ui.prompt.style.transform = `translate(${sx}px, ${sy}px)`;
+        } else if (hudCache.promptText !== '') {
+            ui.prompt.classList.add('hidden');
+            hudCache.promptText = '';
+        }
+
+        const short = it ? it.short : '';
+        if (short !== hudCache.actionShort) {
+            ui.btnActionLabel.textContent = short;
+            ui.btnAction.classList.toggle('ready', !!it);
+            hudCache.actionShort = short;
+        }
     }
 
-    function dist(a, b) { return Math.hypot(a.x-b.x, a.y-b.y); }
-    function normalizeAngle(a) { return a - (2*Math.PI) * Math.floor((a + Math.PI) / (2*Math.PI)); }
-    function lerpAngle(a, b, t) {
-        let d = b - a; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
-        return a + d * t;
-    }
-    function spawnParticles(x, y, n, c) {
-        for(let i=0; i<n; i++) particles.push({
-            x, y, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*10, life:30, size:Math.random()*4, color:c
-        });
-    }
-    function getNearestEnemy(range) {
-        let nearest = null; let minD = range;
-        entities.forEach(e => { if(e.type === 'ENEMY') { let d = dist(player, e); if(d < minD) { minD = d; nearest = e; } } });
-        return nearest;
-    }
-    function showPrompt(obj, text) {
-        let px = obj.x - state.camera.x;
-        let py = obj.y - state.camera.y - 40;
-        ui.prompt.style.display = 'block';
-        ui.prompt.style.left = px + 'px'; ui.prompt.style.top = py + 'px';
-        ui.prompt.innerHTML = `<span style='color:red'>E</span> - ${text}`;
-    }
     function showNotification(text, color) {
+        while (ui.notifArea.children.length >= 3) ui.notifArea.firstElementChild.remove();
         const div = document.createElement('div');
-        div.className = 'pop-text'; div.innerText = text; div.style.color = color;
+        div.className = 'pop-text';
+        div.textContent = text;
+        div.style.color = color;
         ui.notifArea.appendChild(div);
         setTimeout(() => div.remove(), 2000);
     }
+
     function updateDisguiseUI() {
-        let icon = '👤'; if(player.disguise.id === 1) icon = '👮'; if(player.disguise.id === 2) icon = '👹';
-        ui.avatarIcon.innerText = icon;
+        const icons = ['👤', '👮', '👹'];
+        ui.avatarIcon.textContent = icons[player.disguise.id] || '👤';
         ui.avatarBox.style.borderColor = player.disguise.color;
-        ui.outfitName.innerText = player.disguise.name;
+        ui.outfitName.textContent = player.disguise.name;
         ui.outfitName.style.color = player.disguise.color;
     }
-    function showScreen(name) {
-        Object.values(ui.screens).forEach(s => s.classList.add('hidden'));
-        ui.hudTop.classList.add('hidden'); 
-        ui.disguisePanel.classList.add('hidden'); 
-        ui.minimapWrap.classList.add('hidden');
-        document.getElementById('mobile-controls').classList.add('hidden');
 
-        if(name === 'game') { 
-            ui.hudTop.classList.remove('hidden'); 
-            if (window.innerWidth <= 768) {
-                document.getElementById('mobile-controls').classList.remove('hidden');
-                document.getElementById('hud-mobile-extras').classList.remove('hidden');
-                // Move contents
-                document.getElementById('disguise-panel-mobile').appendChild(document.getElementById('disguise-content'));
-                document.getElementById('minimap-wrap-mobile').appendChild(mmCanvas);
-            } else {
-                ui.disguisePanel.classList.remove('hidden'); 
-                ui.minimapWrap.classList.remove('hidden'); 
-                document.getElementById('disguise-panel').appendChild(document.getElementById('disguise-content'));
-                document.getElementById('minimap-wrap').appendChild(mmCanvas);
+    // ---------- SCREENS / FLOW ----------
+    function visiblePrimaryButton() {
+        for (const s of Object.values(ui.screens)) {
+            if (!s.classList.contains('hidden')) return s.querySelector('[data-primary]');
+        }
+        return null;
+    }
+
+    function showScreen(name) {
+        Object.values(ui.screens).forEach((s) => s.classList.add('hidden'));
+        const inGame = name === 'game' || name === 'pause';
+        body.classList.toggle('in-game', inGame);
+        body.classList.toggle('playing', name === 'game');
+        if (name !== 'game') {
+            ui.screens[name].classList.remove('hidden');
+            ui.prompt.classList.add('hidden');
+            hudCache.promptText = '';
+            ui.hiddenIndicator.classList.add('hidden');
+            hudCache.hidden = null;
+            ui.screens[name].scrollTop = 0;
+            if (input.mode === 'desktop') {
+                const btn = ui.screens[name].querySelector('[data-primary]');
+                if (btn) btn.focus({ preventScroll: true });
+            }
+        } else if (document.activeElement && document.activeElement !== document.body) {
+            document.activeElement.blur();
+        }
+        layout();
+    }
+
+    let lastTime = performance.now();
+    let acc = 0;
+    function resetClock() { lastTime = performance.now(); acc = 0; }
+
+    function pause() {
+        if (state.mode !== 'playing') return;
+        state.mode = 'paused';
+        releaseInputs();
+        showScreen('pause');
+    }
+
+    function resume() {
+        if (state.mode !== 'paused') return;
+        state.mode = 'playing';
+        showScreen('game');
+        resetClock();
+    }
+
+    function win() {
+        state.mode = 'win';
+        ui.winTime.textContent = formatTime(state.elapsed);
+        body.classList.remove('alarm');
+        showScreen('win');
+        buzz([60, 40, 60, 40, 120]);
+    }
+
+    function gameOver(reason) {
+        state.mode = 'gameover';
+        ui.failReason.textContent = reason;
+        body.classList.remove('alarm');
+        showScreen('gameover');
+        buzz(250);
+    }
+
+    function toMenu() {
+        state.mode = 'menu';
+        body.classList.remove('alarm');
+        showScreen('menu');
+    }
+
+    function toggleFullscreen() {
+        const d = document, el = d.documentElement;
+        if (d.fullscreenElement || d.webkitFullscreenElement) {
+            const exit = d.exitFullscreen || d.webkitExitFullscreen;
+            if (exit) exit.call(d);
+            return;
+        }
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (!req) return;
+        try {
+            const p = req.call(el, { navigationUI: 'hide' });
+            if (p && p.catch) p.catch(() => {});
+        } catch (_) { /* ignore */ }
+    }
+
+    const actions = {
+        start: () => startGame(1),
+        next: () => startGame(state.level + 1),
+        retry: () => startGame(state.level),
+        menu: toMenu,
+        pause: pause,
+        resume: resume,
+        fullscreen: toggleFullscreen
+    };
+
+    function loop(now) {
+        requestAnimationFrame(loop);
+        pollGamepad();
+        let dt = (now - lastTime) / 1000;
+        lastTime = now;
+        if (!(dt > 0)) dt = 0;
+        if (dt > MAX_FRAME) dt = MAX_FRAME;
+
+        if (state.mode === 'playing') {
+            acc += dt;
+            while (acc >= STEP) {
+                tick();
+                acc -= STEP;
+                if (state.mode !== 'playing') { acc = 0; break; }
             }
         }
-        else { 
-            ui.screens[name].classList.remove('hidden'); 
+        if (state.mode !== 'menu') {
+            const alpha = state.mode === 'playing' ? acc / STEP : 1;
+            render(alpha);
+            updateHud(alpha);
         }
     }
-    function startNew() { startGame(1); }
-    function nextLevel() { startGame(state.level + 1); }
-    function retry() { startGame(state.level); }
-    function toMenu() { state.active = false; showScreen('menu'); }
-    function loop() { update(); draw(); requestAnimationFrame(loop); }
-    function win() { state.active = false; showScreen('win'); }
-    function gameOver(reason) { state.active = false; ui.failReason.innerText = reason; showScreen('gameover'); }
+
+    function init() {
+        const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        input.mode = coarse ? 'touch' : 'desktop';
+        body.classList.toggle('touch-mode', coarse);
+        if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) body.classList.add('no-fs');
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const fn = actions[btn.dataset.action];
+            if (fn) fn();
+        });
+
+        setupKeyboardAndMouse();
+        setupJoystick();
+        setupTouchButtons();
+
+        window.addEventListener('resize', queueLayout);
+        window.addEventListener('orientationchange', () => setTimeout(layout, 250));
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', queueLayout);
+        if (window.ResizeObserver) new ResizeObserver(queueLayout).observe(ui.hudTop);
+        document.addEventListener('fullscreenchange', queueLayout);
+
+        layout();
+        showScreen('menu');
+        requestAnimationFrame((t) => { lastTime = t; loop(t); });
+    }
 
     init();
-    return { startNew, nextLevel, retry, toMenu };
+    return {
+        startNew: actions.start,
+        nextLevel: actions.next,
+        retry: actions.retry,
+        toMenu,
+        pause,
+        resume,
+        // exposed for automated testing / debugging
+        _debug: { state, player, get entities() { return entities; }, get enemies() { return enemies; }, view, input }
+    };
 })();
 </script>
 </body>
